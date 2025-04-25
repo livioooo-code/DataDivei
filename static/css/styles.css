@@ -40,21 +40,98 @@ main {
     box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
 }
 
-/* Pulse animation for the moving marker */
+/* Animation effect styles */
+.vehicle-icon-container {
+    background: transparent;
+    border: none;
+    text-align: center;
+    filter: drop-shadow(0px 0px 3px rgba(0, 0, 0, 0.5));
+}
+
+.vehicle-icon-container i {
+    font-size: 24px;
+    color: #fff;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Pulse animation */
+.marker-pulse {
+    animation: pulse 1.5s infinite;
+}
+
 @keyframes pulse {
     0% {
         transform: scale(0.8);
-        box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7);
+        filter: brightness(100%);
     }
     
     70% {
-        transform: scale(1.1);
-        box-shadow: 0 0 0 10px rgba(52, 152, 219, 0);
+        transform: scale(1.2);
+        filter: brightness(150%);
     }
     
     100% {
         transform: scale(0.8);
-        box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
+        filter: brightness(100%);
+    }
+}
+
+/* Bounce animation */
+.marker-bounce {
+    animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    
+    50% {
+        transform: translateY(-15px);
+    }
+}
+
+/* Achievement notification styling */
+.achievement-notification {
+    position: fixed;
+    bottom: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(40, 167, 69, 0.9);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 2000;
+    transition: all 0.5s ease;
+    font-weight: bold;
+    text-align: center;
+    min-width: 250px;
+    opacity: 0;
+}
+
+.achievement-notification.show-achievement {
+    bottom: 30px;
+    opacity: 1;
+    animation: achievement-appear 3s ease forwards;
+}
+
+@keyframes achievement-appear {
+    0% {
+        bottom: -100px;
+        opacity: 0;
+    }
+    15% {
+        bottom: 30px;
+        opacity: 1;
+    }
+    85% {
+        bottom: 30px;
+        opacity: 1;
+    }
+    100% {
+        bottom: -100px;
+        opacity: 0;
     }
 }
 

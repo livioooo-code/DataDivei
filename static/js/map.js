@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('pauseAnimation').addEventListener('click', pauseAnimation);
     document.getElementById('resetAnimation').addEventListener('click', resetAnimation);
     document.getElementById('animationSpeed').addEventListener('input', updateAnimationSpeed);
+    document.getElementById('animationEffect').addEventListener('change', updateAnimationEffect);
     document.getElementById('saveRoute').addEventListener('click', saveCurrentRoute);
     document.getElementById('openInGoogleMaps').addEventListener('click', openInGoogleMaps);
     
@@ -879,6 +880,17 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset animation index
         currentAnimationIndex = 0;
         
+        // Reset milestones
+        speedMilestones = [];
+        
+        // Clear animation trail
+        clearAnimationTrail();
+        
+        // Update marker appearance
+        if (movingMarker) {
+            movingMarker.setIcon(getVehicleIcon(currentAnimationEffect));
+        }
+        
         // Reset animation display
         updateAnimation();
         
@@ -1185,6 +1197,52 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
+     * Update the animation effect
+     */
+    function updateAnimationEffect() {
+        // Get the selected effect
+        const effectSelect = document.getElementById('animationEffect');
+        currentAnimationEffect = effectSelect.value;
+        
+        // If we have a moving marker, update its icon
+        if (movingMarker) {
+            movingMarker.setIcon(getVehicleIcon(currentAnimationEffect));
+            
+            // If animation is not running, apply the effect once
+            if (!isAnimationRunning && routeCoordinates.length > 0) {
+                applyAnimationEffect(movingMarker.getLatLng());
+            }
+        }
+        
+        // Clear animation trail when changing effect
+        clearAnimationTrail();
+        
+        // If animation is running, update with new effect
+        if (isAnimationRunning) {
+            pauseAnimation();
+            startAnimation();
+        }
+        
+        // Show achievement for changing animation style
+        showAchievement(`Zmieniono styl animacji na: ${getEffectDisplayName(currentAnimationEffect)}!`);
+    }
+    
+    /**
+     * Get user-friendly name for animation effect
+     */
+    function getEffectDisplayName(effect) {
+        const effectNames = {
+            'car': 'Samochód',
+            'motorcycle': 'Motocykl',
+            'bicycle': 'Rower',
+            'bounce': 'Odbijający punkt',
+            'pulse': 'Pulsujący punkt'
+        };
+        
+        return effectNames[effect] || effect;
+    }
+    
+    /**
      * Calculate animation interval based on speed and route length
      */
     function calculateAnimationInterval(speedValue, numPoints) {
@@ -1215,6 +1273,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Reset route ID
         currentRouteId = null;
+        
+        // Clear animation trail
+        clearAnimationTrail();
+        
+        // Reset milestone achievements
+        speedMilestones = [];
         
         // Remove route elements from map
         if (routePath) {
