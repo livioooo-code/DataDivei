@@ -735,6 +735,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pauseAnimation').disabled = true;
         document.getElementById('resetAnimation').disabled = true;
         
+        // Disable Google Maps button
+        document.getElementById('openInGoogleMaps').disabled = true;
+        
         // Update optimize button state
         document.getElementById('optimizeWaypoints').disabled = waypointMarkers.length === 0;
     }

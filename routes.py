@@ -401,6 +401,8 @@ def accept_delivery(delivery_id):
     
     return redirect(url_for('courier_delivery_details', delivery_id=delivery.id))
 
+
+
 @app.route('/api/routes', methods=['GET'])
 def get_routes():
     """Get all saved routes."""
