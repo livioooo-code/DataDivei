@@ -14,6 +14,11 @@ def index():
     """Render the main map page."""
     return render_template('index.html')
 
+@app.route('/sw.js')
+def service_worker():
+    """Serve the service worker file with proper MIME type."""
+    return app.send_static_file('service-worker.js'), 200, {'Content-Type': 'application/javascript'}
+
 @app.route('/api/routes', methods=['GET'])
 def get_routes():
     """Get all saved routes."""

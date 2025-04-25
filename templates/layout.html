@@ -1,9 +1,18 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="pl" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Aplikacja do wizualizacji i animacji tras na mapie">
+    <meta name="theme-color" content="#212529">
     <title>Animated Route Guidance</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    
+    <!-- Ikony dla różnych platform -->
+    <link rel="icon" href="{{ url_for('static', filename='icons/icon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
     
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
@@ -24,6 +33,9 @@
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
     
+    <!-- PWA Support -->
+    <script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
+    
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -39,9 +51,16 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link active" href="/">Map</a>
+                        <a class="nav-link active" href="/">Mapa</a>
                     </li>
                 </ul>
+                
+                <!-- Install PWA Button -->
+                <div class="ms-auto">
+                    <button id="installPwa" class="btn btn-outline-light" style="display: none;">
+                        <i class="fas fa-download me-2"></i>Zainstaluj aplikację
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
