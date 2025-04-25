@@ -1,0 +1,273 @@
+{% extends 'layout.html' %}
+
+{% block title %}Panel użytkownika{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h2 class="card-title">Witaj, {{ current_user.username }}</h2>
+                    <p class="card-text">Z tego panelu możesz zarządzać swoimi trasami i planować dostawy.</p>
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">Przejdź do mapy</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow bg-light">
+                <div class="card-body">
+                    <h4 class="card-title">Twoje konto</h4>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item bg-transparent">Email: {{ current_user.email }}</li>
+                        {% if current_user.first_name or current_user.last_name %}
+                            <li class="list-group-item bg-transparent">
+                                Imię i nazwisko: {{ current_user.first_name }} {{ current_user.last_name }}
+                            </li>
+                        {% endif %}
+                        <li class="list-group-item bg-transparent">Data rejestracji: {{ current_user.created_at.strftime('%d.%m.%Y') }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Twoje zapisane trasy</h4>
+                    <a href="{{ url_for('index') }}" class="btn btn-success btn-sm">
+                        <i class="bi bi-plus-circle"></i> Nowa trasa
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" id="saved-routes-table">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nazwa</th>
+                                    <th>Opis</th>
+                                    <th>Długość (km)</th>
+                                    <th>Czas</th>
+                                    <th>Data utworzenia</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Dane zostaną załadowane przez JavaScript -->
+                                <tr>
+                                    <td colspan="6" class="text-center py-3">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Ładowanie...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h4 class="mb-0">Szybkie akcje</h4>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <a href="{{ url_for('index') }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">Planowanie trasy</h5>
+                                <small><i class="bi bi-arrow-right"></i></small>
+                            </div>
+                            <p class="mb-1">Przejdź do mapy, aby zaplanować nową trasę</p>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action" data-bs-toggle="modal" data-bs-target="#createDeliveryModal">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">Zlecenie dostawy</h5>
+                                <small><i class="bi bi-arrow-right"></i></small>
+                            </div>
+                            <p class="mb-1">Utwórz zlecenie dostawy dla kuriera</p>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h4 class="mb-0">Ostatnia aktywność</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush" id="activity-list">
+                        <!-- Dane zostaną załadowane przez JavaScript -->
+                        <li class="list-group-item d-flex justify-content-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Ładowanie...</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal tworzenia dostawy -->
+<div class="modal fade" id="createDeliveryModal" tabindex="-1" aria-labelledby="createDeliveryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createDeliveryModalLabel">Utwórz nowe zlecenie dostawy</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Aby utworzyć zlecenie dostawy, musisz najpierw utworzyć trasę na mapie.
+                </p>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">Przejdź do mapy</a>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Ładowanie zapisanych tras
+    loadSavedRoutes();
+    
+    // Ładowanie ostatniej aktywności
+    loadRecentActivity();
+    
+    // Funkcja ładowania zapisanych tras
+    function loadSavedRoutes() {
+        fetch('{{ url_for("get_routes") }}')
+            .then(response => response.json())
+            .then(routes => {
+                const tableBody = document.querySelector('#saved-routes-table tbody');
+                
+                if (routes.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-center py-3">
+                                Nie masz jeszcze zapisanych tras. <a href="{{ url_for('index') }}">Utwórz pierwszą trasę</a>.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                routes.forEach(route => {
+                    const distanceKm = (route.distance / 1000).toFixed(1);
+                    const durationMin = Math.round(route.duration / 60);
+                    
+                    let durationText;
+                    if (durationMin < 60) {
+                        durationText = `${durationMin} min`;
+                    } else {
+                        const hours = Math.floor(durationMin / 60);
+                        const mins = durationMin % 60;
+                        durationText = `${hours}h ${mins}min`;
+                    }
+                    
+                    const created = new Date(route.created_at);
+                    const createdText = created.toLocaleDateString('pl-PL', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    html += `
+                        <tr>
+                            <td>${route.name}</td>
+                            <td>${route.description || '-'}</td>
+                            <td>${distanceKm} km</td>
+                            <td>${durationText}</td>
+                            <td>${createdText}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{{ url_for('index') }}?route=${route.id}" class="btn btn-primary">
+                                        <i class="bi bi-eye"></i> Pokaż
+                                    </a>
+                                    <button class="btn btn-success createDeliveryBtn" data-route-id="${route.id}">
+                                        <i class="bi bi-box-seam"></i> Zlecenie
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                tableBody.innerHTML = html;
+                
+                // Dodanie obsługi przycisków tworzenia dostawy
+                document.querySelectorAll('.createDeliveryBtn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const routeId = this.getAttribute('data-route-id');
+                        // Przekierowanie do strony tworzenia dostawy z wybraną trasą
+                        window.location.href = `{{ url_for('index') }}?route=${routeId}&create_delivery=true`;
+                    });
+                });
+            })
+            .catch(error => {
+                console.error('Błąd podczas pobierania tras:', error);
+                document.querySelector('#saved-routes-table tbody').innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-3 text-danger">
+                            <i class="bi bi-exclamation-triangle"></i> Wystąpił błąd podczas ładowania tras.
+                        </td>
+                    </tr>
+                `;
+            });
+    }
+    
+    // Funkcja ładowania ostatniej aktywności
+    function loadRecentActivity() {
+        // Symulacja ładowania ostatniej aktywności
+        // W rzeczywistej aplikacji, zastąp to wywołaniem do API
+        setTimeout(() => {
+            const activityList = document.getElementById('activity-list');
+            activityList.innerHTML = `
+                <li class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">Zalogowanie do systemu</h6>
+                        <small class="text-muted">Przed chwilą</small>
+                    </div>
+                    <p class="mb-1 small">Pomyślnie zalogowano do systemu</p>
+                </li>
+                <li class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">Wczytanie panelu</h6>
+                        <small class="text-muted">Przed chwilą</small>
+                    </div>
+                    <p class="mb-1 small">Załadowano panel użytkownika</p>
+                </li>
+            `;
+        }, 1000);
+    }
+});
+</script>
+{% endblock %}

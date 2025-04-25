@@ -51,16 +51,92 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link active" href="/">Mapa</a>
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-map-marked-alt me-1"></i> Mapa
+                        </a>
                     </li>
+                    
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard') }}">
+                                <i class="fas fa-tachometer-alt me-1"></i> Panel
+                            </a>
+                        </li>
+                        
+                        {% if current_user.is_courier %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="courierDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-shipping-fast me-1"></i> Kurier
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="courierDropdown">
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('courier_deliveries') }}">
+                                            <i class="fas fa-truck me-1"></i> Moje dostawy
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('available_deliveries') }}">
+                                            <i class="fas fa-search me-1"></i> Dostępne dostawy
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('courier_profile') }}">
+                                            <i class="fas fa-id-card me-1"></i> Profil kuriera
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                        {% endif %}
+                    {% endif %}
                 </ul>
                 
-                <!-- Install PWA Button -->
-                <div class="ms-auto">
-                    <button id="installPwa" class="btn btn-outline-light" style="display: none;">
-                        <i class="fas fa-download me-2"></i>Zainstaluj aplikację
-                    </button>
-                </div>
+                <ul class="navbar-nav ms-auto">
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user-circle me-1"></i> {{ current_user.username }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('dashboard') }}">
+                                        <i class="fas fa-tachometer-alt me-1"></i> Panel
+                                    </a>
+                                </li>
+                                {% if current_user.is_courier %}
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('courier_profile') }}">
+                                            <i class="fas fa-id-card me-1"></i> Profil kuriera
+                                        </a>
+                                    </li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('logout') }}">
+                                        <i class="fas fa-sign-out-alt me-1"></i> Wyloguj
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('login') }}">
+                                <i class="fas fa-sign-in-alt me-1"></i> Logowanie
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('register') }}">
+                                <i class="fas fa-user-plus me-1"></i> Rejestracja
+                            </a>
+                        </li>
+                    {% endif %}
+                    
+                    <!-- Install PWA Button -->
+                    <li class="nav-item">
+                        <button id="installPwa" class="btn btn-outline-light mt-1 mt-lg-0 ms-lg-2" style="display: none;">
+                            <i class="fas fa-download me-1"></i> Zainstaluj
+                        </button>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
@@ -71,7 +147,7 @@
 
     <footer class="bg-dark text-light py-3 mt-4">
         <div class="container text-center">
-            <small>&copy; 2023 Animated Route Guidance</small>
+            <small>&copy; 2025 Animated Route Guidance | System dla kurierów</small>
         </div>
     </footer>
 

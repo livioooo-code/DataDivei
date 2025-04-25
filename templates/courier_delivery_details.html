@@ -1,0 +1,397 @@
+{% extends 'layout.html' %}
+
+{% block title %}Szczegóły dostawy{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Dostawa #{{ delivery.id }}</h1>
+        <a href="{{ url_for('courier_deliveries') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Powrót do listy
+        </a>
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Informacje o dostawie</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5>Status</h5>
+                            <p>
+                                <span class="badge {% if delivery.status == 'new' %}bg-info{% elif delivery.status == 'assigned' %}bg-primary{% elif delivery.status == 'in_progress' %}bg-warning{% elif delivery.status == 'delivered' %}bg-success{% elif delivery.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %} fs-6">
+                                    {{ delivery.status }}
+                                </span>
+                            </p>
+                            
+                            <h5>Dane przesyłki</h5>
+                            <p><strong>ID przesyłki:</strong> {{ delivery.package_id or 'Brak' }}</p>
+                            <p><strong>Waga:</strong> {{ delivery.weight }} kg</p>
+                            <p><strong>Opis:</strong> {{ delivery.package_description or 'Brak opisu' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Odbiorca</h5>
+                            <p><strong>Nazwa:</strong> {{ delivery.recipient_name }}</p>
+                            <p><strong>Telefon:</strong> {{ delivery.recipient_phone or 'Nie podano' }}</p>
+                            <p><strong>Email:</strong> {{ delivery.recipient_email or 'Nie podano' }}</p>
+                            
+                            <h5>Terminy</h5>
+                            <p><strong>Utworzono:</strong> {{ delivery.created_at.strftime('%d.%m.%Y %H:%M') }}</p>
+                            <p><strong>Czas odbioru:</strong> {{ delivery.pickup_time.strftime('%d.%m.%Y %H:%M') if delivery.pickup_time else 'Nie odebrano' }}</p>
+                            <p><strong>Szacowany czas dostawy:</strong> {{ delivery.estimated_delivery_time.strftime('%d.%m.%Y %H:%M') if delivery.estimated_delivery_time else 'Nie określono' }}</p>
+                            <p><strong>Czas dostarczenia:</strong> {{ delivery.delivery_time.strftime('%d.%m.%Y %H:%M') if delivery.delivery_time else 'Nie dostarczono' }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0">Adres odbioru</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1">{{ delivery.pickup_address }}</p>
+                                    {% if delivery.pickup_lat and delivery.pickup_lng %}
+                                    <a href="https://www.google.com/maps?q={{ delivery.pickup_lat }},{{ delivery.pickup_lng }}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                                        <i class="bi bi-geo-alt"></i> Pokaż na mapie
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0">Adres dostawy</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1">{{ delivery.delivery_address }}</p>
+                                    {% if delivery.delivery_lat and delivery.delivery_lng %}
+                                    <a href="https://www.google.com/maps?q={{ delivery.delivery_lat }},{{ delivery.delivery_lng }}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                                        <i class="bi bi-geo-alt"></i> Pokaż na mapie
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if delivery.notes %}
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Notatki</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-0">{{ delivery.notes }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if delivery.delivery_photo %}
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Zdjęcie potwierdzające dostawę</h5>
+                        </div>
+                        <div class="card-body text-center">
+                            <img src="{{ delivery.delivery_photo }}" class="img-fluid rounded" alt="Zdjęcie dostawy" style="max-height: 300px;">
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-4">
+                        <a href="#map-section" class="btn btn-primary">
+                            <i class="bi bi-map"></i> Pokaż trasę
+                        </a>
+                        <a href="tel:{{ delivery.recipient_phone }}" class="btn btn-success {% if not delivery.recipient_phone %}disabled{% endif %}">
+                            <i class="bi bi-telephone"></i> Zadzwoń do odbiorcy
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow mb-4" id="map-section">
+                <div class="card-header">
+                    <h4 class="mb-0">Mapa trasy</h4>
+                </div>
+                <div class="card-body p-0">
+                    <div id="delivery-map" style="height: 400px;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Aktualizacja statusu</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_delivery_status', delivery_id=delivery.id) }}" enctype="multipart/form-data">
+                        {{ status_form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            {{ status_form.status.label(class="form-label") }}
+                            {{ status_form.status(class="form-select") }}
+                            {% if status_form.status.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in status_form.status.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ status_form.notes.label(class="form-label") }}
+                            {{ status_form.notes(class="form-control", rows=3) }}
+                            {% if status_form.notes.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in status_form.notes.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ status_form.delivery_photo.label(class="form-label") }}
+                            {{ status_form.delivery_photo(class="form-control") }}
+                            {% if status_form.delivery_photo.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in status_form.delivery_photo.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Dodaj zdjęcie potwierdzające dostawę (opcjonalnie).</div>
+                        </div>
+                        
+                        <!-- Ukryte pola do przechowywania aktualnej lokalizacji -->
+                        {{ status_form.current_lat(id="current_lat") }}
+                        {{ status_form.current_lng(id="current_lng") }}
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-arrow-clockwise"></i> Aktualizuj status
+                            </button>
+                            <button type="button" id="get-location-btn" class="btn btn-outline-secondary">
+                                <i class="bi bi-geo-alt"></i> Uzyskaj aktualną lokalizację
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card shadow">
+                <div class="card-header">
+                    <h4 class="mb-0">Historia statusów</h4>
+                </div>
+                <div class="card-body">
+                    {% if status_history %}
+                        <div class="timeline">
+                            {% for status in status_history %}
+                                <div class="timeline-item mb-3">
+                                    <div class="timeline-badge {% if status.status == 'new' %}bg-info{% elif status.status == 'assigned' %}bg-primary{% elif status.status == 'in_progress' %}bg-warning{% elif status.status == 'delivered' %}bg-success{% elif status.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                        <i class="bi bi-circle-fill"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">{{ status.status }}</h6>
+                                        <p class="text-muted small mb-1">{{ status.timestamp.strftime('%d.%m.%Y %H:%M') }}</p>
+                                        {% if status.notes %}
+                                            <p class="mb-0">{{ status.notes }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-center text-muted mb-0">Brak historii statusów.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    
+    .timeline:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 9px;
+        height: 100%;
+        width: 2px;
+        background: #e9ecef;
+    }
+    
+    .timeline-item {
+        position: relative;
+    }
+    
+    .timeline-badge {
+        position: absolute;
+        left: -30px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        text-align: center;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .timeline-badge i {
+        font-size: 0.5rem;
+    }
+    
+    .timeline-content {
+        padding-left: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicjalizacja mapy
+    var map = L.map('delivery-map').setView([52.229676, 21.012229], 13); // Domyślny widok - Warszawa
+    
+    // Dodanie warstwy OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    
+    // Pobieranie współrzędnych
+    var pickupLat = {{ delivery.pickup_lat or 'null' }};
+    var pickupLng = {{ delivery.pickup_lng or 'null' }};
+    var deliveryLat = {{ delivery.delivery_lat or 'null' }};
+    var deliveryLng = {{ delivery.delivery_lng or 'null' }};
+    
+    var bounds = [];
+    
+    // Dodanie markera punktu odbioru
+    if (pickupLat && pickupLng) {
+        var pickupMarker = L.marker([pickupLat, pickupLng], {
+            icon: L.divIcon({
+                className: 'custom-div-icon',
+                html: '<div style="background-color: #3498db; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            })
+        }).addTo(map);
+        pickupMarker.bindPopup('<strong>Punkt odbioru</strong><br>' + '{{ delivery.pickup_address }}');
+        bounds.push([pickupLat, pickupLng]);
+    }
+    
+    // Dodanie markera punktu dostawy
+    if (deliveryLat && deliveryLng) {
+        var deliveryMarker = L.marker([deliveryLat, deliveryLng], {
+            icon: L.divIcon({
+                className: 'custom-div-icon',
+                html: '<div style="background-color: #e74c3c; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            })
+        }).addTo(map);
+        deliveryMarker.bindPopup('<strong>Punkt dostawy</strong><br>' + '{{ delivery.delivery_address }}');
+        bounds.push([deliveryLat, deliveryLng]);
+    }
+    
+    // Rysowanie trasy na podstawie polyline z trasy
+    {% if delivery.route.polyline %}
+    var routePolyline = L.polyline(polyline.decode('{{ delivery.route.polyline }}'), {
+        color: '#3498db',
+        weight: 5,
+        opacity: 0.7
+    }).addTo(map);
+    {% endif %}
+    
+    // Dopasowanie widoku mapy
+    if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }
+    
+    // Obsługa przycisku lokalizacji
+    var locationBtn = document.getElementById('get-location-btn');
+    var latInput = document.getElementById('current_lat');
+    var lngInput = document.getElementById('current_lng');
+    
+    locationBtn.addEventListener('click', function() {
+        if (navigator.geolocation) {
+            locationBtn.textContent = 'Pobieranie lokalizacji...';
+            locationBtn.disabled = true;
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    // Zapisanie współrzędnych w ukrytych polach formularza
+                    latInput.value = position.coords.latitude;
+                    lngInput.value = position.coords.longitude;
+                    
+                    // Aktualizacja przycisku
+                    locationBtn.innerHTML = '<i class="bi bi-check-circle"></i> Lokalizacja uzyskana';
+                    locationBtn.classList.remove('btn-outline-secondary');
+                    locationBtn.classList.add('btn-success');
+                    
+                    // Dodanie markera aktualnej lokalizacji na mapie
+                    var currentLocationMarker = L.marker([position.coords.latitude, position.coords.longitude], {
+                        icon: L.divIcon({
+                            className: 'custom-div-icon',
+                            html: '<div style="background-color: #2ecc71; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(map);
+                    currentLocationMarker.bindPopup('<strong>Twoja aktualna lokalizacja</strong>');
+                    
+                    // Dostosowanie widoku mapy
+                    bounds.push([position.coords.latitude, position.coords.longitude]);
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                    
+                    setTimeout(function() {
+                        locationBtn.disabled = false;
+                    }, 2000);
+                },
+                function(error) {
+                    console.error('Błąd pobierania lokalizacji:', error);
+                    locationBtn.innerHTML = '<i class="bi bi-x-circle"></i> Błąd pobierania lokalizacji';
+                    locationBtn.classList.remove('btn-outline-secondary');
+                    locationBtn.classList.add('btn-danger');
+                    
+                    setTimeout(function() {
+                        locationBtn.innerHTML = '<i class="bi bi-geo-alt"></i> Uzyskaj aktualną lokalizację';
+                        locationBtn.classList.remove('btn-danger');
+                        locationBtn.classList.add('btn-outline-secondary');
+                        locationBtn.disabled = false;
+                    }, 3000);
+                }
+            );
+        } else {
+            alert('Geolokalizacja nie jest obsługiwana przez twoją przeglądarkę.');
+        }
+    });
+});
+</script>
+{% endblock %}

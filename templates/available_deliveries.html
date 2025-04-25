@@ -1,0 +1,359 @@
+{% extends 'layout.html' %}
+
+{% block title %}Dostępne dostawy{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Dostępne dostawy</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+    
+    <div class="card shadow mb-4">
+        <div class="card-header bg-success text-white">
+            <h4 class="mb-0">
+                <i class="bi bi-search"></i> Znajdź dostawy do realizacji
+            </h4>
+        </div>
+        <div class="card-body">
+            <p class="lead">Twój profil:</p>
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="mb-2">
+                        <strong>Pojazd:</strong> {{ courier.vehicle_type }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Maksymalna waga:</strong> {{ courier.max_weight or 'Nie określono' }} kg
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-2">
+                        <strong>Preferowana strefa:</strong> {{ courier.work_zone or 'Nie określono' }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Status:</strong> 
+                        <span class="badge {% if courier.status == 'online' %}bg-success{% elif courier.status == 'busy' %}bg-warning{% else %}bg-secondary{% endif %}">
+                            {{ courier.status }}
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="{{ url_for('courier_profile') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil-square"></i> Edytuj profil
+                    </a>
+                </div>
+            </div>
+            
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Poniżej znajdują się dostępne dostawy, które możesz podjąć. Wybierz dostawę, aby sprawdzić szczegóły i ją zaakceptować.
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="bi bi-funnel"></i>
+                </span>
+                <input type="text" class="form-control" id="searchInput" placeholder="Filtruj dostawy...">
+            </div>
+        </div>
+        
+        <div class="col-md-4 ms-auto text-end">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary" id="refreshDeliveries">
+                    <i class="bi bi-arrow-clockwise"></i> Odśwież
+                </button>
+                <button type="button" class="btn btn-outline-primary" id="showOnMap">
+                    <i class="bi bi-map"></i> Pokaż na mapie
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row" id="deliveriesContainer">
+        {% if deliveries %}
+            {% for delivery in deliveries %}
+                <div class="col-md-6 mb-4 delivery-card" 
+                     data-address="{{ delivery.delivery_address }}"
+                     data-recipient="{{ delivery.recipient_name }}"
+                     data-weight="{{ delivery.weight }}">
+                    <div class="card shadow h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Dostawa #{{ delivery.id }}</h5>
+                            <span class="badge bg-info">Nowa</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <h6>Adresy</h6>
+                                    <p class="mb-1"><strong>Odbiór:</strong> {{ delivery.pickup_address }}</p>
+                                    <p><strong>Dostawa:</strong> {{ delivery.delivery_address }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Informacje</h6>
+                                    <p class="mb-1"><strong>Odbiorca:</strong> {{ delivery.recipient_name }}</p>
+                                    <p class="mb-1"><strong>Waga:</strong> {{ delivery.weight }} kg</p>
+                                    <p><strong>Szac. dostarczenie:</strong> {{ delivery.estimated_delivery_time.strftime('%d.%m.%Y %H:%M') if delivery.estimated_delivery_time else 'Nie określono' }}</p>
+                                </div>
+                            </div>
+                            
+                            {% if delivery.package_description %}
+                                <div class="mb-3">
+                                    <h6>Opis przesyłki</h6>
+                                    <p class="mb-0">{{ delivery.package_description }}</p>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-primary">
+                                    <i class="bi bi-geo-alt"></i> 
+                                    {% if delivery.pickup_lat and delivery.pickup_lng and delivery.delivery_lat and delivery.delivery_lng %}
+                                        {% set distance = ((delivery.pickup_lat - delivery.delivery_lat) ** 2 + (delivery.pickup_lng - delivery.delivery_lng) ** 2) ** 0.5 * 111 %}
+                                        Ok. {{ "%.1f"|format(distance) }} km
+                                    {% else %}
+                                        Dystans nieznany
+                                    {% endif %}
+                                </span>
+                                <form method="POST" action="{{ url_for('accept_delivery', delivery_id=delivery.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-check-circle"></i> Akceptuj dostawę
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> Brak dostępnych dostaw w tym momencie. Odśwież stronę później.
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="row mt-4" id="mapSection" style="display: none;">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Mapa dostępnych dostaw</h4>
+                    <button class="btn btn-sm btn-outline-secondary" id="hideMap">
+                        <i class="bi bi-x-lg"></i> Zamknij mapę
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="deliveries-map" style="height: 500px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Wróć do panelu
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Obsługa filtrowania
+    const searchInput = document.getElementById('searchInput');
+    const deliveryCards = document.querySelectorAll('.delivery-card');
+    
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        
+        deliveryCards.forEach(card => {
+            const address = card.dataset.address.toLowerCase();
+            const recipient = card.dataset.recipient.toLowerCase();
+            const weight = card.dataset.weight;
+            
+            if (address.includes(searchTerm) || recipient.includes(searchTerm) || weight.includes(searchTerm)) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+    
+    // Obsługa odświeżania
+    const refreshButton = document.getElementById('refreshDeliveries');
+    if (refreshButton) {
+        refreshButton.addEventListener('click', function() {
+            location.reload();
+        });
+    }
+    
+    // Obsługa mapy
+    const showMapButton = document.getElementById('showOnMap');
+    const hideMapButton = document.getElementById('hideMap');
+    const mapSection = document.getElementById('mapSection');
+    
+    if (showMapButton) {
+        showMapButton.addEventListener('click', function() {
+            mapSection.style.display = 'block';
+            initMap();
+            // Przewiń do mapy
+            mapSection.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+    
+    if (hideMapButton) {
+        hideMapButton.addEventListener('click', function() {
+            mapSection.style.display = 'none';
+        });
+    }
+    
+    function initMap() {
+        // Inicjalizacja mapy tylko gdy jest widoczna
+        if (mapSection.style.display === 'none') return;
+        
+        // Sprawdź czy mapa już istnieje
+        if (window.deliveriesMap) return;
+        
+        // Inicjalizacja mapy
+        const map = L.map('deliveries-map').setView([52.229676, 21.012229], 11); // Domyślny widok - Warszawa
+        window.deliveriesMap = map;
+        
+        // Dodanie warstwy OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Dodanie markerów dla dostępnych dostaw
+        const bounds = [];
+        
+        {% for delivery in deliveries %}
+            {% if delivery.pickup_lat and delivery.pickup_lng %}
+                var pickupMarker = L.marker([{{ delivery.pickup_lat }}, {{ delivery.pickup_lng }}], {
+                    icon: L.divIcon({
+                        className: 'custom-div-icon',
+                        html: '<div style="background-color: #3498db; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    })
+                }).addTo(map);
+                pickupMarker.bindPopup('<strong>Odbiór #{{ delivery.id }}</strong><br>{{ delivery.pickup_address }}');
+                bounds.push([{{ delivery.pickup_lat }}, {{ delivery.pickup_lng }}]);
+            {% endif %}
+            
+            {% if delivery.delivery_lat and delivery.delivery_lng %}
+                var deliveryMarker = L.marker([{{ delivery.delivery_lat }}, {{ delivery.delivery_lng }}], {
+                    icon: L.divIcon({
+                        className: 'custom-div-icon',
+                        html: '<div style="background-color: #e74c3c; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    })
+                }).addTo(map);
+                deliveryMarker.bindPopup(
+                    '<strong>Dostawa #{{ delivery.id }}</strong><br>' + 
+                    '{{ delivery.delivery_address }}<br>' +
+                    'Odbiorca: {{ delivery.recipient_name }}<br>' +
+                    'Waga: {{ delivery.weight }} kg<br>' +
+                    '<a href="{{ url_for("accept_delivery", delivery_id=delivery.id) }}" class="btn btn-sm btn-success mt-2" onclick="return confirm(\'Czy na pewno chcesz przyjąć tę dostawę?\')">Akceptuj</a>'
+                );
+                bounds.push([{{ delivery.delivery_lat }}, {{ delivery.delivery_lng }}]);
+            {% endif %}
+        {% endfor %}
+        
+        // Dodanie markera aktualnej lokalizacji kuriera
+        {% if courier.current_lat and courier.current_lng %}
+            var courierMarker = L.marker([{{ courier.current_lat }}, {{ courier.current_lng }}], {
+                icon: L.divIcon({
+                    className: 'custom-div-icon',
+                    html: '<div style="background-color: #2ecc71; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white;"></div>',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                })
+            }).addTo(map);
+            courierMarker.bindPopup('<strong>Twoja aktualna lokalizacja</strong>');
+            bounds.push([{{ courier.current_lat }}, {{ courier.current_lng }}]);
+        {% endif %}
+        
+        // Dopasowanie widoku mapy
+        if (bounds.length > 0) {
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+        
+        // Jeśli nie ma lokalizacji kuriera, spróbuj ją uzyskać
+        {% if not courier.current_lat or not courier.current_lng %}
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        var lat = position.coords.latitude;
+                        var lng = position.coords.longitude;
+                        
+                        // Dodaj marker aktualnej lokalizacji
+                        var currentLocationMarker = L.marker([lat, lng], {
+                            icon: L.divIcon({
+                                className: 'custom-div-icon',
+                                html: '<div style="background-color: #2ecc71; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white;"></div>',
+                                iconSize: [30, 30],
+                                iconAnchor: [15, 15]
+                            })
+                        }).addTo(map);
+                        currentLocationMarker.bindPopup('<strong>Twoja aktualna lokalizacja</strong>');
+                        
+                        // Dostosuj widok mapy
+                        bounds.push([lat, lng]);
+                        if (bounds.length > 0) {
+                            map.fitBounds(bounds, { padding: [50, 50] });
+                        }
+                        
+                        // Opcjonalnie: zapisz lokalizację na serwerze
+                        updateLocation(lat, lng);
+                    },
+                    function(error) {
+                        console.error('Błąd pobierania lokalizacji:', error);
+                    }
+                );
+            }
+        {% endif %}
+    }
+    
+    // Funkcja aktualizacji lokalizacji kuriera na serwerze
+    function updateLocation(lat, lng) {
+        fetch('{{ url_for("update_courier_status") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                status: '{{ courier.status }}',
+                lat: lat,
+                lng: lng
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Lokalizacja zaktualizowana:', data);
+        })
+        .catch(error => {
+            console.error('Błąd aktualizacji lokalizacji:', error);
+        });
+    }
+});
+</script>
+{% endblock %}
