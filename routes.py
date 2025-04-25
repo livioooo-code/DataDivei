@@ -618,26 +618,57 @@ def check_traffic_updates():
         new_duration = traffic_update.get('new_duration', old_duration)
         duration_change_pct = (new_duration - old_duration) / old_duration * 100
         
+        # Extract traffic conditions from the update
+        traffic_conditions = []
+        avg_traffic_level = 0
+        traffic_delay = 0
+        
+        if 'traffic_conditions' in traffic_update:
+            traffic_conditions = traffic_update['traffic_conditions']
+            
+            # Calculate average traffic level
+            if traffic_conditions:
+                traffic_level_sum = sum(condition.get('level', 0) for condition in traffic_conditions)
+                avg_traffic_level = round(traffic_level_sum / len(traffic_conditions), 1)
+                
+            # Calculate total traffic delay
+            traffic_delay = sum(condition.get('delay_seconds', 0) for condition in traffic_conditions)
+            
+        # Format traffic delay text
+        delay_minutes = int(traffic_delay / 60)
+        traffic_delay_text = f"+{delay_minutes}min" if delay_minutes > 0 else "Brak opóźnień"
+        
+        # Determine if there are significant updates
+        has_updates = False
+        update_reason = "Brak zmian w ruchu drogowym"
+        
+        if abs(duration_change_pct) >= 10:  # 10% change is significant
+            has_updates = True
+            if duration_change_pct > 0:
+                update_reason = f"Zwiększone natężenie ruchu, czas podróży +{round(duration_change_pct)}%"
+            else:
+                update_reason = f"Zmniejszone natężenie ruchu, czas podróży -{round(abs(duration_change_pct))}%"
+        
         # Update stored route data if we have new information
-        if traffic_update.get('has_updates', False):
+        if has_updates:
             app.current_routes[route_id].update({
                 'duration': new_duration,
-                'traffic_delay': traffic_update.get('traffic_delay', 0),
-                'avg_traffic_level': traffic_update.get('avg_traffic_level', 0),
+                'traffic_delay': traffic_delay,
+                'avg_traffic_level': avg_traffic_level,
                 'timestamp': datetime.now().timestamp()
             })
         
         # Prepare response
         response = {
-            'has_updates': traffic_update.get('has_updates', False),
-            'update_reason': traffic_update.get('reason', ''),
+            'has_updates': has_updates,
+            'update_reason': update_reason,
             'old_duration': old_duration,
             'new_duration': new_duration,
             'duration_change_pct': round(duration_change_pct, 1),
-            'traffic_conditions': traffic_update.get('traffic_conditions', []),
-            'traffic_delay': traffic_update.get('traffic_delay', 0),
-            'traffic_delay_text': traffic_update.get('traffic_delay_text', ''),
-            'avg_traffic_level': traffic_update.get('avg_traffic_level', 0),
+            'traffic_conditions': traffic_conditions,
+            'traffic_delay': traffic_delay,
+            'traffic_delay_text': traffic_delay_text,
+            'avg_traffic_level': avg_traffic_level,
             'last_checked': datetime.now().isoformat()
         }
         
