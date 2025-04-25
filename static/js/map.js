@@ -11,9 +11,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let locationWatchId = null;
     let currentLocationMarker = null;
     let waypointCounter = 0;
+    let currentRouteData = null; // Store the current route data
     
-    // Initialize map centered on a default location (New York City)
+    // Initialize map centered on a default location
     initMap();
+    
+    // Load saved routes
+    loadSavedRoutes();
     
     // Set up event listeners
     document.getElementById('calculateRoute').addEventListener('click', calculateRoute);
@@ -21,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('pauseAnimation').addEventListener('click', pauseAnimation);
     document.getElementById('resetAnimation').addEventListener('click', resetAnimation);
     document.getElementById('animationSpeed').addEventListener('input', updateAnimationSpeed);
+    document.getElementById('saveRoute').addEventListener('click', saveCurrentRoute);
     
     // Add location tracking button listeners
     document.getElementById('getCurrentLocation').addEventListener('click', getCurrentLocation);
@@ -593,10 +598,223 @@ document.addEventListener('DOMContentLoaded', function() {
         const minutes = Math.floor((seconds % 3600) / 60);
         
         if (hours > 0) {
-            return `${hours} hr ${minutes} min`;
+            return `${hours} godz. ${minutes} min`;
         } else {
             return `${minutes} min`;
         }
+    }
+    
+    /**
+     * Save the current route to the database
+     */
+    function saveCurrentRoute() {
+        if (!currentRouteData) {
+            alert('Najpierw oblicz trasę, aby ją zapisać');
+            return;
+        }
+        
+        const routeName = document.getElementById('routeName').value.trim();
+        if (!routeName) {
+            alert('Podaj nazwę trasy');
+            return;
+        }
+        
+        // Disable save button and show loading state
+        const saveButton = document.getElementById('saveRoute');
+        const originalText = saveButton.innerHTML;
+        saveButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Zapisywanie...';
+        saveButton.disabled = true;
+        
+        // Get start and end positions
+        const startLatLng = startMarker.getLatLng();
+        const endLatLng = endMarker.getLatLng();
+        
+        // Collect waypoints
+        const waypoints = waypointMarkers.map(m => {
+            const pos = m.marker.getLatLng();
+            return [pos.lat, pos.lng];
+        });
+        
+        // Create route data object
+        const routeData = {
+            name: routeName,
+            description: document.getElementById('routeDescription').value.trim(),
+            start: [startLatLng.lat, startLatLng.lng],
+            end: [endLatLng.lat, endLatLng.lng],
+            waypoints: waypoints,
+            encoded_polyline: currentRouteData.encoded_polyline,
+            distance: currentRouteData.distance,
+            duration: currentRouteData.duration
+        };
+        
+        // Send route data to the server
+        fetch('/api/routes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(routeData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Reset button state
+            saveButton.innerHTML = originalText;
+            saveButton.disabled = false;
+            
+            // Show success message
+            alert('Trasa została zapisana pomyślnie');
+            
+            // Clear input fields
+            document.getElementById('routeName').value = '';
+            document.getElementById('routeDescription').value = '';
+            
+            // Refresh saved routes list
+            loadSavedRoutes();
+        })
+        .catch(error => {
+            console.error('Error saving route:', error);
+            saveButton.innerHTML = originalText;
+            saveButton.disabled = false;
+            alert('Wystąpił błąd podczas zapisywania trasy. Spróbuj ponownie.');
+        });
+    }
+    
+    /**
+     * Load saved routes from the database
+     */
+    function loadSavedRoutes() {
+        const routesList = document.getElementById('savedRoutesList');
+        const noRoutesMessage = document.getElementById('noRoutesMessage');
+        
+        // Show loading state
+        routesList.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Ładowanie tras...</div>';
+        
+        // Fetch routes from the server
+        fetch('/api/routes')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(routes => {
+            // Clear the list
+            routesList.innerHTML = '';
+            
+            if (routes.length === 0) {
+                // Show no routes message
+                noRoutesMessage.style.display = 'block';
+            } else {
+                // Hide no routes message
+                noRoutesMessage.style.display = 'none';
+                
+                // Add each route to the list
+                routes.forEach(route => {
+                    const routeItem = document.createElement('button');
+                    routeItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                    routeItem.innerHTML = `
+                        <div>
+                            <h6 class="mb-1">${route.name}</h6>
+                            <p class="mb-1 small text-muted">
+                                ${formatDistance(route.distance)} • ${formatDuration(route.duration)}
+                            </p>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    `;
+                    
+                    // Add click event to load the route
+                    routeItem.addEventListener('click', function() {
+                        loadRoute(route.id);
+                    });
+                    
+                    routesList.appendChild(routeItem);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error loading routes:', error);
+            routesList.innerHTML = '<div class="text-center text-danger">Błąd ładowania tras</div>';
+        });
+    }
+    
+    /**
+     * Load a specific route from the database
+     */
+    function loadRoute(routeId) {
+        // Show loading state
+        const routesList = document.getElementById('savedRoutesList');
+        routesList.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Ładowanie trasy...</div>';
+        
+        // Fetch route data from the server
+        fetch(`/api/route/${routeId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(route => {
+            // Clear any existing route
+            clearRoute();
+            
+            // Set start and end points
+            setStartPoint(route.start[0], route.start[1]);
+            setEndPoint(route.end[0], route.end[1]);
+            
+            // Add waypoints if any
+            if (route.waypoints && route.waypoints.length > 0) {
+                route.waypoints.forEach(waypoint => {
+                    addWaypointAt(waypoint[0], waypoint[1]);
+                });
+            }
+            
+            // Draw route on the map
+            const coordinates = route.polyline ? polyline.decode(route.polyline) : [];
+            routeCoordinates = coordinates;
+            
+            // Store current route data
+            currentRouteData = {
+                encoded_polyline: route.polyline,
+                distance: route.distance,
+                duration: route.duration
+            };
+            
+            // Draw the route
+            drawRoute(routeCoordinates);
+            
+            // Update route info
+            document.querySelector('.route-info').style.display = 'block';
+            document.getElementById('routeDistance').textContent = formatDistance(route.distance);
+            document.getElementById('routeDuration').textContent = formatDuration(route.duration);
+            
+            // Pre-fill route name for saving
+            document.getElementById('routeName').value = `Kopia: ${route.name}`;
+            if (route.description) {
+                document.getElementById('routeDescription').value = route.description;
+            }
+            
+            // Enable animation controls
+            document.getElementById('startAnimation').disabled = false;
+            document.getElementById('pauseAnimation').disabled = true;
+            document.getElementById('resetAnimation').disabled = false;
+            
+            // Fit map to show the entire route
+            const bounds = L.latLngBounds(routeCoordinates);
+            map.fitBounds(bounds, { padding: [50, 50] });
+            
+            // Reload the routes list
+            loadSavedRoutes();
+        })
+        .catch(error => {
+            console.error('Error loading route:', error);
+            routesList.innerHTML = '<div class="text-center text-danger">Błąd ładowania trasy</div>';
+            setTimeout(loadSavedRoutes, 2000);
+        });
     }
     
     /**
