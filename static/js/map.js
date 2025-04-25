@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('resetAnimation').addEventListener('click', resetAnimation);
     document.getElementById('animationSpeed').addEventListener('input', updateAnimationSpeed);
     document.getElementById('saveRoute').addEventListener('click', saveCurrentRoute);
+    document.getElementById('openInGoogleMaps').addEventListener('click', openInGoogleMaps);
     
     // Add location tracking button listeners
     document.getElementById('getCurrentLocation').addEventListener('click', getCurrentLocation);
@@ -43,10 +44,44 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateRoute(true); // true for optimization
     });
     
-    // Set up coordinate input fields
+    // Set up address/coordinate input fields
     const startInput = document.getElementById('startLocation');
     const endInput = document.getElementById('endLocation');
     
+    // Add search button next to start input
+    const startSearchBtn = document.getElementById('searchStartAddress');
+    startSearchBtn.addEventListener('click', function() {
+        const address = startInput.value;
+        if (address && address.trim() !== '') {
+            geocodeAddress(address, 'startLocation', setStartPoint);
+        }
+    });
+    
+    // Add search button next to end input
+    const endSearchBtn = document.getElementById('searchEndAddress');
+    endSearchBtn.addEventListener('click', function() {
+        const address = endInput.value;
+        if (address && address.trim() !== '') {
+            geocodeAddress(address, 'endLocation', setEndPoint);
+        }
+    });
+    
+    // Handle Enter key press in input fields
+    startInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            startSearchBtn.click();
+        }
+    });
+    
+    endInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            endSearchBtn.click();
+        }
+    });
+    
+    // Legacy support for direct coordinate input
     startInput.addEventListener('change', function() {
         const coords = parseCoordinates(this.value);
         if (coords) {
@@ -172,6 +207,53 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
+     * Geocode address using backend API
+     */
+    function geocodeAddress(addressString, targetElementId, callback) {
+        // Show loading state
+        const targetElement = document.getElementById(targetElementId);
+        const originalValue = targetElement.value;
+        targetElement.value = "Szukam adresu...";
+        targetElement.disabled = true;
+        
+        // Call the geocoding API
+        fetch(`/api/geocode?query=${encodeURIComponent(addressString)}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                targetElement.disabled = false;
+                
+                if (data.length > 0) {
+                    // Use the first (best) result
+                    const location = data[0];
+                    const coords = [location.lat, location.lng];
+                    
+                    // Update the input field with formatted address
+                    targetElement.value = location.display_name;
+                    
+                    // Call the callback with coordinates
+                    if (callback && typeof callback === 'function') {
+                        callback(coords[0], coords[1]);
+                    }
+                } else {
+                    // No results found
+                    targetElement.value = originalValue;
+                    alert('Nie znaleziono podanego adresu. Spróbuj podać bardziej dokładny adres.');
+                }
+            })
+            .catch(error => {
+                console.error('Error geocoding address:', error);
+                targetElement.disabled = false;
+                targetElement.value = originalValue;
+                alert('Wystąpił błąd podczas wyszukiwania adresu. Spróbuj ponownie.');
+            });
+    }
+    
+    /**
      * Add a new empty waypoint to the route
      */
     function addWaypoint() {
@@ -212,10 +294,32 @@ document.addEventListener('DOMContentLoaded', function() {
         input.type = 'text';
         input.className = 'form-control waypoint-input';
         input.id = waypointId;
-        input.placeholder = 'Click on map or enter coords';
+        input.placeholder = 'Wpisz adres lub współrzędne';
         input.dataset.waypointId = waypointCounter;
         
-        // Add change event to input
+        // Create search button
+        const searchBtn = document.createElement('button');
+        searchBtn.className = 'btn btn-outline-primary';
+        searchBtn.type = 'button';
+        searchBtn.innerHTML = '<i class="fas fa-search"></i>';
+        searchBtn.onclick = function() {
+            const address = input.value;
+            if (address && address.trim() !== '') {
+                geocodeAddress(address, waypointId, function(lat, lng) {
+                    updateWaypointMarker(waypointId, lat, lng);
+                });
+            }
+        };
+        
+        // Add Enter key press handler
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchBtn.click();
+            }
+        });
+        
+        // Add change event to input for legacy coordinate support
         input.addEventListener('change', function() {
             const coords = parseCoordinates(this.value);
             if (coords) {
@@ -226,6 +330,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Assemble the elements
         inputGroup.appendChild(inputGroupText);
         inputGroup.appendChild(input);
+        inputGroup.appendChild(searchBtn);
         waypointDiv.appendChild(label);
         waypointDiv.appendChild(inputGroup);
         
@@ -428,6 +533,61 @@ document.addEventListener('DOMContentLoaded', function() {
                 iconSize: [15, 15]
             })
         }).addTo(map);
+        
+        // Enable Google Maps button
+        document.getElementById('openInGoogleMaps').disabled = false;
+    }
+    
+    /**
+     * Open the current route in Google Maps
+     */
+    function openInGoogleMaps() {
+        if (!startMarker || !endMarker) {
+            alert('Najpierw ustaw punkty początkowy i końcowy');
+            return;
+        }
+        
+        const startLatLng = startMarker.getLatLng();
+        const endLatLng = endMarker.getLatLng();
+        
+        // Collect waypoints
+        const waypointCoords = waypointMarkers.map(m => {
+            const pos = m.marker.getLatLng();
+            return `${pos.lat},${pos.lng}`;
+        });
+        
+        // Build Google Maps URL
+        let googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${startLatLng.lat},${startLatLng.lng}&destination=${endLatLng.lat},${endLatLng.lng}`;
+        
+        // Add waypoints if there are any
+        if (waypointCoords.length > 0) {
+            googleMapsUrl += `&waypoints=${waypointCoords.join('|')}`;
+        }
+        
+        // Open in new tab
+        window.open(googleMapsUrl, '_blank');
+    }
+    
+    /**
+     * Mark a waypoint as visited and remove it from the route
+     */
+    function markWaypointVisited(waypointIndex) {
+        if (waypointIndex < 0 || waypointIndex >= waypointMarkers.length) {
+            return false;
+        }
+        
+        // Get the waypoint to remove
+        const waypoint = waypointMarkers[waypointIndex];
+        
+        // Remove it from the map and array
+        removeWaypoint(waypoint.id);
+        
+        // Recalculate the route if there are still points
+        if (startMarker && endMarker) {
+            calculateRoute(false);
+        }
+        
+        return true;
     }
     
     /**

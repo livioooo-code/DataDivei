@@ -36,12 +36,15 @@
                 <h3 class="mb-3">Route Controls</h3>
                 
                 <div class="mb-3">
-                    <label for="startLocation" class="form-label">Start Point</label>
+                    <label for="startLocation" class="form-label">Punkt początkowy</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
-                        <input type="text" class="form-control" id="startLocation" placeholder="Click on map or enter coords">
+                        <input type="text" class="form-control" id="startLocation" placeholder="Wpisz adres (miejscowość, ulica, numer)">
+                        <button class="btn btn-outline-primary" type="button" id="searchStartAddress">
+                            <i class="fas fa-search"></i>
+                        </button>
                     </div>
-                    <small class="text-muted">Format: lat, lng (e.g. 40.7128, -74.0060)</small>
+                    <small class="text-muted">Np. Warszawa, Marszałkowska 100 lub 52.123, 21.456</small>
                 </div>
                 
                 <!-- Waypoints container -->
@@ -50,10 +53,13 @@
                 </div>
                 
                 <div class="mb-3">
-                    <label for="endLocation" class="form-label">End Point</label>
+                    <label for="endLocation" class="form-label">Punkt końcowy</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="fas fa-map-marker"></i></span>
-                        <input type="text" class="form-control" id="endLocation" placeholder="Click on map or enter coords">
+                        <input type="text" class="form-control" id="endLocation" placeholder="Wpisz adres (miejscowość, ulica, numer)">
+                        <button class="btn btn-outline-primary" type="button" id="searchEndAddress">
+                            <i class="fas fa-search"></i>
+                        </button>
                     </div>
                 </div>
                 
@@ -66,9 +72,15 @@
                     </button>
                 </div>
                 
-                <div class="d-grid mb-4">
+                <div class="d-grid mb-2">
                     <button id="calculateRoute" class="btn btn-primary">
-                        <i class="fas fa-route me-2"></i>Calculate Route
+                        <i class="fas fa-route me-2"></i>Oblicz trasę
+                    </button>
+                </div>
+                
+                <div class="d-grid mb-4">
+                    <button id="openInGoogleMaps" class="btn btn-success" disabled>
+                        <i class="fas fa-external-link-alt me-2"></i>Otwórz w Google Maps
                     </button>
                 </div>
                 
