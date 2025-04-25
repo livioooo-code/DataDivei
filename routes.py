@@ -2,9 +2,12 @@ import os
 import requests
 import json
 import polyline
-from flask import render_template, request, jsonify
+from flask import render_template, request, jsonify, url_for, redirect, flash
+from flask_login import login_user, logout_user, login_required, current_user
 from app import app, db
-from models import Route
+from models import Route, User, user_routes
+from werkzeug.security import generate_password_hash, check_password_hash
+from forms import LoginForm, RegistrationForm
 
 @app.route('/')
 def index():
@@ -63,19 +66,15 @@ def get_directions():
             route_data = data['routes'][0]
             geometry = route_data['geometry']  # This is already an encoded polyline
             
-            # If you want to save the route
-            if 'save' in request.args and request.args['save'] == 'true':
-                name = request.args.get('name', f"Route with {len(waypoints)} waypoints")
-                new_route = Route(
-                    name=name,
-                    start_lat=start[0],
-                    start_lng=start[1],
-                    end_lat=end[0],
-                    end_lng=end[1],
-                    polyline=geometry
-                )
-                db.session.add(new_route)
-                db.session.commit()
+            # For saving routes later
+            route_save_data = {
+                'geometry': geometry,
+                'distance': route_data['distance'],
+                'duration': route_data['duration'],
+                'start': start,
+                'end': end,
+                'waypoints': waypoints
+            }
             
             decoded_polyline = polyline.decode(geometry)
             
@@ -118,6 +117,51 @@ def get_directions():
     except requests.RequestException as e:
         app.logger.error(f"Error fetching directions: {str(e)}")
         return jsonify({'error': 'Failed to fetch directions'}), 500
+
+@app.route('/api/routes', methods=['POST'])
+def save_route():
+    """Save a route to the database."""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'Missing route data'}), 400
+        
+    required_fields = ['start', 'end', 'name', 'encoded_polyline', 'distance', 'duration']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'Missing required field: {field}'}), 400
+    
+    start = data['start']  # [lat, lng]
+    end = data['end']      # [lat, lng]
+    waypoints = data.get('waypoints', [])
+    
+    # Create new route record
+    new_route = Route(
+        name=data['name'],
+        description=data.get('description', ''),
+        start_lat=start[0],
+        start_lng=start[1],
+        end_lat=end[0],
+        end_lng=end[1],
+        polyline=data['encoded_polyline'],
+        distance=data['distance'],
+        duration=data['duration'],
+        waypoints=json.dumps(waypoints) if waypoints else None
+    )
+    
+    try:
+        db.session.add(new_route)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Route saved successfully',
+            'route_id': new_route.id,
+            'route': new_route.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error saving route: {str(e)}")
+        return jsonify({'error': 'Failed to save route'}), 500
         
 @app.route('/api/geocode', methods=['GET'])
 def geocode_address():

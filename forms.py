@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
-from models import Courier
+from models import User
 
 class LoginForm(FlaskForm):
     username = StringField('Nazwa użytkownika', validators=[DataRequired()])
@@ -33,12 +33,12 @@ class RegistrationForm(FlaskForm):
     
     def validate_username(self, username):
         """Sprawdza, czy nazwa użytkownika jest już zajęta"""
-        courier = Courier.query.filter_by(username=username.data).first()
-        if courier:
+        user = User.query.filter_by(username=username.data).first()
+        if user:
             raise ValidationError('Ta nazwa użytkownika jest już zajęta. Wybierz inną.')
             
     def validate_email(self, email):
         """Sprawdza, czy email jest już zajęty"""
-        courier = Courier.query.filter_by(email=email.data).first()
-        if courier:
+        user = User.query.filter_by(email=email.data).first()
+        if user:
             raise ValidationError('Ten adres email jest już zarejestrowany. Użyj innego adresu lub zaloguj się.')
