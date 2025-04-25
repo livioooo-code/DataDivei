@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentLocationMarker = null;
     let waypointCounter = 0;
     let currentRouteData = null; // Store the current route data
+    let routeSegmentLayers = []; // Store route segments with traffic colors
+    let currentRouteId = null; // Current route ID for traffic updates
     
     // Initialize map centered on a default location
     initMap();
@@ -436,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
         clearRoute();
         
         // Show loading state
-        document.getElementById('calculateRoute').innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading...';
+        document.getElementById('calculateRoute').innerHTML = '<span class="spinner-border spinner-border-sm"></span> Obliczanie...';
         document.getElementById('calculateRoute').disabled = true;
         
         // Get coordinates
@@ -459,7 +461,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 start: [startLatLng.lat, startLatLng.lng],
                 end: [endLatLng.lat, endLatLng.lng],
                 waypoints: waypoints,
-                optimize: optimize
+                optimize: optimize,
+                include_traffic: true
             })
         })
         .then(response => {
@@ -470,7 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(data => {
             // Reset button state
-            document.getElementById('calculateRoute').innerHTML = '<i class="fas fa-route me-2"></i>Calculate Route';
+            document.getElementById('calculateRoute').innerHTML = '<i class="fas fa-route me-2"></i>Oblicz trasę';
             document.getElementById('calculateRoute').disabled = false;
             
             // Process the route
@@ -478,13 +481,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Store route coordinates
                 routeCoordinates = data.route.map(point => [point[0], point[1]]);
                 
-                // Draw the route on the map
-                drawRoute(routeCoordinates);
+                // Store route ID for traffic updates
+                if (data.route_id) {
+                    currentRouteId = data.route_id;
+                }
+                
+                // Store current route data
+                currentRouteData = {
+                    encoded_polyline: data.encoded_polyline,
+                    distance: data.distance,
+                    duration: data.duration,
+                    base_duration: data.base_duration,
+                    traffic_delay: data.traffic_delay,
+                    has_traffic_data: data.has_traffic_data
+                };
+                
+                // Draw the route on the map with traffic information
+                if (data.has_traffic_data && data.route_segments) {
+                    drawRouteWithTraffic(routeCoordinates, data.route_segments);
+                } else {
+                    drawRoute(routeCoordinates);
+                }
                 
                 // Update route info
                 document.querySelector('.route-info').style.display = 'block';
                 document.getElementById('routeDistance').textContent = formatDistance(data.distance);
                 document.getElementById('routeDuration').textContent = formatDuration(data.duration);
+                
+                // Show traffic information if available
+                if (data.has_traffic_data && data.traffic_delay > 0) {
+                    document.querySelector('.traffic-info').style.display = 'flex';
+                    document.getElementById('trafficDelay').textContent = data.traffic_delay_text || `+${Math.round(data.traffic_delay / 60)} min`;
+                    
+                    // Show traffic conditions
+                    showTrafficConditions(data.traffic_conditions, data.avg_traffic_level);
+                    
+                    // Add traffic update button listener
+                    document.getElementById('checkTrafficUpdates').addEventListener('click', checkTrafficUpdates);
+                }
                 
                 // Enable animation controls
                 document.getElementById('startAnimation').disabled = false;
@@ -495,15 +529,224 @@ document.addEventListener('DOMContentLoaded', function() {
                 const bounds = L.latLngBounds(routeCoordinates);
                 map.fitBounds(bounds, { padding: [50, 50] });
             } else {
-                alert('Could not find a route between these points');
+                alert('Nie znaleziono trasy między wybranymi punktami');
             }
         })
         .catch(error => {
             console.error('Error calculating route:', error);
-            document.getElementById('calculateRoute').innerHTML = '<i class="fas fa-route me-2"></i>Calculate Route';
+            document.getElementById('calculateRoute').innerHTML = '<i class="fas fa-route me-2"></i>Oblicz trasę';
             document.getElementById('calculateRoute').disabled = false;
-            alert('Error calculating route. Please try again.');
+            alert('Wystąpił błąd podczas obliczania trasy. Spróbuj ponownie.');
         });
+    }
+    
+    /**
+     * Draw route on the map with traffic information
+     */
+    function drawRouteWithTraffic(coordinates, segments) {
+        // Clear any existing route segments
+        for (let i = 0; i < routeSegmentLayers.length; i++) {
+            map.removeLayer(routeSegmentLayers[i]);
+        }
+        routeSegmentLayers = [];
+        
+        // Draw segments with traffic colors
+        if (segments && segments.length > 0) {
+            segments.forEach(segment => {
+                if (segment.coordinates && segment.coordinates.length > 1) {
+                    // Determine traffic color based on level
+                    let colorClass = 'route-segment-green'; // Default
+                    
+                    if (segment.traffic_level === 1) {
+                        colorClass = 'route-segment-yellow';
+                    } else if (segment.traffic_level === 2) {
+                        colorClass = 'route-segment-orange';
+                    } else if (segment.traffic_level === 3) {
+                        colorClass = 'route-segment-red';
+                    }
+                    
+                    // Create segment polyline
+                    const segmentLayer = L.polyline(segment.coordinates, {
+                        className: colorClass
+                    }).addTo(map);
+                    
+                    // Store reference to segment layer
+                    routeSegmentLayers.push(segmentLayer);
+                }
+            });
+        } else {
+            // Fallback to regular route drawing if no segments
+            drawRoute(coordinates);
+        }
+        
+        // Create animated path (initially empty)
+        animatedPath = L.polyline([], {
+            color: '#007bff',
+            weight: 6,
+            opacity: 1,
+            className: 'animated-route-path'
+        }).addTo(map);
+        
+        // Create the moving marker
+        movingMarker = L.marker(coordinates[0], {
+            icon: L.divIcon({
+                className: 'animated-marker',
+                iconSize: [15, 15]
+            })
+        }).addTo(map);
+        
+        // Enable Google Maps button
+        document.getElementById('openInGoogleMaps').disabled = false;
+    }
+    
+    /**
+     * Show traffic conditions in the UI
+     */
+    function showTrafficConditions(conditions, avgLevel) {
+        const trafficContainer = document.querySelector('.traffic-conditions');
+        const segmentsContainer = document.getElementById('trafficSegments');
+        
+        // Show traffic container
+        trafficContainer.style.display = 'block';
+        
+        // Update traffic level indicator
+        updateTrafficLevelIndicator(avgLevel);
+        
+        // Add individual segments if available
+        if (conditions && conditions.length > 0) {
+            segmentsContainer.innerHTML = '';
+            
+            conditions.forEach((condition, index) => {
+                if (condition.level > 0) { // Only show segments with traffic
+                    const segmentDiv = document.createElement('div');
+                    segmentDiv.className = 'traffic-segment';
+                    
+                    const indicator = document.createElement('span');
+                    indicator.className = 'traffic-segment-indicator ' + condition.color;
+                    
+                    const text = document.createElement('span');
+                    text.className = 'traffic-segment-text';
+                    text.textContent = `Segment ${index + 1}: ${condition.delay_seconds > 0 ? '+' + Math.round(condition.delay_seconds / 60) + ' min' : 'Brak opóźnień'}`;
+                    
+                    segmentDiv.appendChild(indicator);
+                    segmentDiv.appendChild(text);
+                    segmentsContainer.appendChild(segmentDiv);
+                }
+            });
+        }
+    }
+    
+    /**
+     * Update traffic level indicator
+     */
+    function updateTrafficLevelIndicator(level) {
+        // Reset all indicators
+        const bars = document.querySelectorAll('.traffic-level-bar');
+        bars.forEach(bar => bar.classList.remove('active'));
+        
+        // Calculate number of active bars based on traffic level (0-3)
+        const activeBarCount = Math.min(Math.ceil(level), 3);
+        
+        // Activate appropriate bars
+        for (let i = 0; i < activeBarCount; i++) {
+            const bar = document.querySelector(`.traffic-level-bar[data-level="${i+1}"]`);
+            if (bar) {
+                bar.classList.add('active');
+            }
+        }
+    }
+    
+    /**
+     * Check for traffic updates
+     */
+    function checkTrafficUpdates() {
+        if (!currentRouteId) {
+            return;
+        }
+        
+        const updateButton = document.getElementById('checkTrafficUpdates');
+        updateButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sprawdzanie...';
+        updateButton.disabled = true;
+        
+        fetch('/api/traffic/check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                route_id: currentRouteId
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            updateButton.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Aktualizuj dane o ruchu';
+            updateButton.disabled = false;
+            
+            if (data.has_updates) {
+                // Update route info with new traffic data
+                document.getElementById('routeDuration').textContent = formatDuration(data.new_duration);
+                document.getElementById('trafficDelay').textContent = data.traffic_delay_text;
+                
+                // Show alert about traffic change
+                const changeDirection = data.duration_change_pct > 0 ? 'dłuższy' : 'krótszy';
+                const changeAmount = Math.abs(Math.round(data.duration_change_pct));
+                alert(`Aktualizacja ruchu: czas podróży jest teraz ${changeDirection} o ${changeAmount}%.
+                    ${data.update_reason}`);
+                
+                // Update traffic level indicators and segments
+                updateTrafficLevelIndicator(data.avg_traffic_level);
+                showTrafficConditions(data.traffic_conditions, data.avg_traffic_level);
+                
+                // Update stored route data
+                currentRouteData.duration = data.new_duration;
+                currentRouteData.traffic_delay = data.traffic_delay;
+            } else {
+                alert('Brak zmian w ruchu drogowym od ostatniego sprawdzenia.');
+            }
+        })
+        .catch(error => {
+            console.error('Error checking traffic updates:', error);
+            updateButton.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Aktualizuj dane o ruchu';
+            updateButton.disabled = false;
+            alert('Błąd podczas sprawdzania aktualizacji ruchu.');
+        });
+    }
+    
+    /**
+     * Draw the route on the map
+     */
+    function drawRoute(coordinates) {
+        // Create the main route path
+        routePath = L.polyline(coordinates, {
+            color: '#5cb85c',
+            weight: 5,
+            opacity: 0.7,
+            className: 'route-path'
+        }).addTo(map);
+        
+        // Create animated path (initially empty)
+        animatedPath = L.polyline([], {
+            color: '#007bff',
+            weight: 6,
+            opacity: 1,
+            className: 'animated-route-path'
+        }).addTo(map);
+        
+        // Create the moving marker
+        movingMarker = L.marker(coordinates[0], {
+            icon: L.divIcon({
+                className: 'animated-marker',
+                iconSize: [15, 15]
+            })
+        }).addTo(map);
+        
+        // Enable Google Maps button
+        document.getElementById('openInGoogleMaps').disabled = false;
     }
     
     /**
@@ -711,6 +954,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear route coordinates
         routeCoordinates = [];
         
+        // Reset route ID
+        currentRouteId = null;
+        
         // Remove route elements from map
         if (routePath) {
             map.removeLayer(routePath);
@@ -727,8 +973,23 @@ document.addEventListener('DOMContentLoaded', function() {
             movingMarker = null;
         }
         
+        // Remove traffic segment layers
+        for (let i = 0; i < routeSegmentLayers.length; i++) {
+            map.removeLayer(routeSegmentLayers[i]);
+        }
+        routeSegmentLayers = [];
+        
         // Reset route info display
         document.querySelector('.route-info').style.display = 'none';
+        
+        // Reset traffic info elements
+        document.querySelector('.traffic-info').style.display = 'none';
+        document.querySelector('.traffic-conditions').style.display = 'none';
+        document.getElementById('trafficSegments').innerHTML = '';
+        
+        // Reset traffic level indicators
+        const levelBars = document.querySelectorAll('.traffic-level-bar');
+        levelBars.forEach(bar => bar.classList.remove('active'));
         
         // Disable animation controls
         document.getElementById('startAnimation').disabled = true;

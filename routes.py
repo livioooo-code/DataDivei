@@ -417,7 +417,7 @@ def get_route(route_id):
 
 @app.route('/api/directions', methods=['POST'])
 def get_directions():
-    """Get directions between multiple points using OSRM."""
+    """Get directions between multiple points using OSRM, with traffic data."""
     data = request.get_json()
     
     if not data or 'start' not in data or 'end' not in data:
@@ -427,6 +427,7 @@ def get_directions():
     end = data['end']      # [lat, lng]
     waypoints = data.get('waypoints', [])  # optional waypoints [[lat, lng], [lat, lng], ...]
     optimize = data.get('optimize', False)  # optional waypoint optimization flag
+    include_traffic = data.get('include_traffic', True)  # Include traffic data by default
     
     # Build coordinates string for OSRM API
     coords = [f"{start[1]},{start[0]}"]  # Start with origin (lng,lat format for OSRM)
@@ -455,26 +456,39 @@ def get_directions():
             route_data = data['routes'][0]
             geometry = route_data['geometry']  # This is already an encoded polyline
             
-            # For saving routes later
-            route_save_data = {
-                'geometry': geometry,
-                'distance': route_data['distance'],
-                'duration': route_data['duration'],
-                'start': start,
-                'end': end,
-                'waypoints': waypoints
-            }
-            
             decoded_polyline = polyline.decode(geometry)
             
-            # Return enhanced route information
+            # Create a list of coordinates for further processing
+            coordinates = []
+            # OSRM returns [longitude, latitude], but our system uses [latitude, longitude]
+            for point in decoded_polyline:
+                coordinates.append([point[0], point[1]])  # lat, lng
+                
+            # Get detailed route information with traffic data
+            from route_optimizer import get_route_details
+            route_details = get_route_details(coordinates, include_traffic=include_traffic)
+            
+            # Extract basic route information
+            base_duration = route_details.get('base_duration_seconds', route_data['duration'])
+            traffic_delay = route_details.get('traffic_delay_seconds', 0)
+            total_duration = base_duration + traffic_delay
+            total_distance = route_details.get('total_distance', route_data['distance'])
+            
+            # Enhanced result with traffic information
             result = {
                 'route': decoded_polyline,
                 'encoded_polyline': geometry,
-                'distance': route_data['distance'],
-                'duration': route_data['duration'],
+                'distance': total_distance,
+                'duration': total_duration,
+                'base_duration': base_duration,
+                'traffic_delay': traffic_delay,
+                'traffic_delay_text': route_details.get('traffic_delay_text', 'No delays'),
                 'waypoints': waypoints,
-                'legs': []
+                'legs': [],
+                'has_traffic_data': include_traffic,
+                'traffic_conditions': route_details.get('traffic_conditions', []),
+                'avg_traffic_level': route_details.get('avg_traffic_level', 0),
+                'route_segments': route_details.get('segments', [])
             }
             
             # Add leg information if available
@@ -497,6 +511,30 @@ def get_directions():
                         leg_info['to'] = f'Waypoint {i+1}'
                         
                     result['legs'].append(leg_info)
+            
+            # For saving routes later (include traffic info)
+            current_route_data = {
+                'geometry': geometry,
+                'distance': total_distance,
+                'duration': total_duration,
+                'base_duration': base_duration,
+                'traffic_delay': traffic_delay,
+                'start': start,
+                'end': end,
+                'waypoints': waypoints,
+                'avg_traffic_level': result['avg_traffic_level'],
+                'timestamp': datetime.now().timestamp()
+            }
+            
+            # Store in app context for later reference
+            if not hasattr(app, 'current_routes'):
+                app.current_routes = {}
+                
+            # Generate a unique ID for this route
+            import uuid
+            route_id = str(uuid.uuid4())
+            app.current_routes[route_id] = current_route_data
+            result['route_id'] = route_id
             
             return jsonify(result)
         else:
@@ -552,6 +590,63 @@ def save_route():
         app.logger.error(f"Error saving route: {str(e)}")
         return jsonify({'error': 'Failed to save route'}), 500
         
+@app.route('/api/traffic/check', methods=['POST'])
+def check_traffic_updates():
+    """Check for traffic updates on a previously calculated route."""
+    data = request.get_json()
+    
+    if not data or 'route_id' not in data:
+        return jsonify({'error': 'Missing route_id parameter'}), 400
+        
+    route_id = data['route_id']
+    
+    # Check if we have this route stored
+    if not hasattr(app, 'current_routes') or route_id not in app.current_routes:
+        return jsonify({'error': 'Route not found'}), 404
+    
+    route_data = app.current_routes[route_id]
+    
+    try:
+        # Use the check_for_traffic_updates function from route_optimizer
+        from route_optimizer import check_for_traffic_updates
+        
+        # Get updated traffic information
+        traffic_update = check_for_traffic_updates(route_data)
+        
+        # Calculate the percentage change in duration
+        old_duration = route_data['duration']
+        new_duration = traffic_update.get('new_duration', old_duration)
+        duration_change_pct = (new_duration - old_duration) / old_duration * 100
+        
+        # Update stored route data if we have new information
+        if traffic_update.get('has_updates', False):
+            app.current_routes[route_id].update({
+                'duration': new_duration,
+                'traffic_delay': traffic_update.get('traffic_delay', 0),
+                'avg_traffic_level': traffic_update.get('avg_traffic_level', 0),
+                'timestamp': datetime.now().timestamp()
+            })
+        
+        # Prepare response
+        response = {
+            'has_updates': traffic_update.get('has_updates', False),
+            'update_reason': traffic_update.get('reason', ''),
+            'old_duration': old_duration,
+            'new_duration': new_duration,
+            'duration_change_pct': round(duration_change_pct, 1),
+            'traffic_conditions': traffic_update.get('traffic_conditions', []),
+            'traffic_delay': traffic_update.get('traffic_delay', 0),
+            'traffic_delay_text': traffic_update.get('traffic_delay_text', ''),
+            'avg_traffic_level': traffic_update.get('avg_traffic_level', 0),
+            'last_checked': datetime.now().isoformat()
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        app.logger.error(f"Error checking traffic updates: {str(e)}")
+        return jsonify({'error': f'Failed to check traffic updates: {str(e)}'}), 500
+
 @app.route('/api/geocode', methods=['GET'])
 def geocode_address():
     """Geocode an address to coordinates using OpenStreetMap Nominatim API."""

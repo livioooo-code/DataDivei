@@ -151,6 +151,97 @@ main {
     }
 }
 
+/* Traffic indicator styles */
+.traffic-level-indicator {
+    display: flex;
+    height: 16px;
+    background-color: #2a2e33;
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100px;
+}
+
+.traffic-level-bar {
+    height: 100%;
+    width: 33.33%;
+    opacity: 0.3;
+    transition: opacity 0.3s ease;
+}
+
+.traffic-level-bar[data-level="1"] {
+    background-color: #ffc107; /* Yellow for light traffic */
+}
+
+.traffic-level-bar[data-level="2"] {
+    background-color: #fd7e14; /* Orange for moderate traffic */
+}
+
+.traffic-level-bar[data-level="3"] {
+    background-color: #dc3545; /* Red for heavy traffic */
+}
+
+.traffic-level-bar.active {
+    opacity: 1;
+}
+
+.traffic-segment {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.traffic-segment-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.traffic-segment-indicator.green {
+    background-color: #28a745;
+}
+
+.traffic-segment-indicator.yellow {
+    background-color: #ffc107;
+}
+
+.traffic-segment-indicator.orange {
+    background-color: #fd7e14;
+}
+
+.traffic-segment-indicator.red {
+    background-color: #dc3545;
+}
+
+.traffic-segment-indicator.gray {
+    background-color: #6c757d;
+}
+
+/* Traffic colors for route segments */
+.route-segment-green {
+    stroke: #28a745;
+    stroke-width: 5;
+    stroke-opacity: 0.9;
+}
+
+.route-segment-yellow {
+    stroke: #ffc107;
+    stroke-width: 5;
+    stroke-opacity: 0.9;
+}
+
+.route-segment-orange {
+    stroke: #fd7e14;
+    stroke-width: 5;
+    stroke-opacity: 0.9;
+}
+
+.route-segment-red {
+    stroke: #dc3545;
+    stroke-width: 5;
+    stroke-opacity: 0.9;
+}
+
 /* Specific iPhone fixes */
 @supports (-webkit-touch-callout: none) {
     /* iOS specific styles */
