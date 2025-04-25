@@ -750,38 +750,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * Draw the route on the map
-     */
-    function drawRoute(coordinates) {
-        // Create the main route path
-        routePath = L.polyline(coordinates, {
-            color: '#5cb85c',
-            weight: 5,
-            opacity: 0.7,
-            className: 'route-path'
-        }).addTo(map);
-        
-        // Create animated path (initially empty)
-        animatedPath = L.polyline([], {
-            color: '#007bff',
-            weight: 6,
-            opacity: 1,
-            className: 'animated-route-path'
-        }).addTo(map);
-        
-        // Create the moving marker
-        movingMarker = L.marker(coordinates[0], {
-            icon: L.divIcon({
-                className: 'animated-marker',
-                iconSize: [15, 15]
-            })
-        }).addTo(map);
-        
-        // Enable Google Maps button
-        document.getElementById('openInGoogleMaps').disabled = false;
-    }
-    
-    /**
      * Open the current route in Google Maps
      */
     function openInGoogleMaps() {
