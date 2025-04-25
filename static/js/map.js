@@ -2,11 +2,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize variables
     let map;
     let startMarker, endMarker, movingMarker;
+    let waypointMarkers = [];
     let routePath, animatedPath;
     let routeCoordinates = [];
     let animationInterval;
     let currentAnimationIndex = 0;
     let isAnimationRunning = false;
+    let locationWatchId = null;
+    let currentLocationMarker = null;
+    let waypointCounter = 0;
     
     // Initialize map centered on a default location (New York City)
     initMap();
@@ -17,6 +21,22 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('pauseAnimation').addEventListener('click', pauseAnimation);
     document.getElementById('resetAnimation').addEventListener('click', resetAnimation);
     document.getElementById('animationSpeed').addEventListener('input', updateAnimationSpeed);
+    
+    // Add location tracking button listeners
+    document.getElementById('getCurrentLocation').addEventListener('click', getCurrentLocation);
+    document.getElementById('useCurrentLocationStart').addEventListener('click', function() {
+        useCurrentLocationFor('start');
+    });
+    document.getElementById('useCurrentLocationEnd').addEventListener('click', function() {
+        useCurrentLocationFor('end');
+    });
+    document.getElementById('stopLocationTracking').addEventListener('click', stopLocationTracking);
+    
+    // Add waypoint button listeners
+    document.getElementById('addWaypoint').addEventListener('click', addWaypoint);
+    document.getElementById('optimizeWaypoints').addEventListener('click', function() {
+        calculateRoute(true); // true for optimization
+    });
     
     // Set up coordinate input fields
     const startInput = document.getElementById('startLocation');
@@ -49,12 +69,15 @@ document.addEventListener('DOMContentLoaded', function() {
             attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
         }).addTo(map);
         
-        // Add click handler for setting start/end points
+        // Add click handler for setting start/end points and waypoints
         map.on('click', function(e) {
             if (!startMarker) {
                 setStartPoint(e.latlng.lat, e.latlng.lng);
             } else if (!endMarker) {
                 setEndPoint(e.latlng.lat, e.latlng.lng);
+            } else {
+                // If both start and end are set, add a waypoint
+                addWaypointAt(e.latlng.lat, e.latlng.lng);
             }
         });
     }
@@ -144,9 +167,155 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * Calculate the route between start and end points
+     * Add a new empty waypoint to the route
      */
-    function calculateRoute() {
+    function addWaypoint() {
+        waypointCounter++;
+        const waypointId = `waypoint-${waypointCounter}`;
+        
+        // Create waypoint container
+        const waypointDiv = document.createElement('div');
+        waypointDiv.className = 'mb-3 waypoint-container';
+        waypointDiv.id = waypointId + '-container';
+        
+        // Create label
+        const label = document.createElement('label');
+        label.className = 'form-label d-flex justify-content-between align-items-center';
+        label.innerHTML = `<span>Punkt pośredni ${waypointCounter}</span>`;
+        
+        // Create delete button in label
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-sm btn-outline-danger';
+        deleteBtn.type = 'button';
+        deleteBtn.innerHTML = '<i class="fas fa-times"></i>';
+        deleteBtn.onclick = function() {
+            removeWaypoint(waypointId);
+        };
+        label.appendChild(deleteBtn);
+        
+        // Create input group
+        const inputGroup = document.createElement('div');
+        inputGroup.className = 'input-group';
+        
+        // Create input group text (icon)
+        const inputGroupText = document.createElement('span');
+        inputGroupText.className = 'input-group-text';
+        inputGroupText.innerHTML = '<i class="fas fa-map-pin"></i>';
+        
+        // Create input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control waypoint-input';
+        input.id = waypointId;
+        input.placeholder = 'Click on map or enter coords';
+        input.dataset.waypointId = waypointCounter;
+        
+        // Add change event to input
+        input.addEventListener('change', function() {
+            const coords = parseCoordinates(this.value);
+            if (coords) {
+                updateWaypointMarker(waypointId, coords[0], coords[1]);
+            }
+        });
+        
+        // Assemble the elements
+        inputGroup.appendChild(inputGroupText);
+        inputGroup.appendChild(input);
+        waypointDiv.appendChild(label);
+        waypointDiv.appendChild(inputGroup);
+        
+        // Add to the container
+        document.getElementById('waypointsContainer').appendChild(waypointDiv);
+        
+        // Enable optimize button if we have any waypoints
+        document.getElementById('optimizeWaypoints').disabled = false;
+        
+        // Return the waypoint ID for reference
+        return waypointId;
+    }
+    
+    /**
+     * Add a waypoint at specific coordinates
+     */
+    function addWaypointAt(lat, lng) {
+        const waypointId = addWaypoint();
+        updateWaypointMarker(waypointId, lat, lng);
+        
+        // Update input field
+        document.getElementById(waypointId).value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
+    
+    /**
+     * Update or create a waypoint marker
+     */
+    function updateWaypointMarker(waypointId, lat, lng) {
+        // Find existing marker if there is one
+        let marker = waypointMarkers.find(m => m.id === waypointId);
+        
+        // Remove existing marker if it exists
+        if (marker) {
+            map.removeLayer(marker.marker);
+            waypointMarkers = waypointMarkers.filter(m => m.id !== waypointId);
+        }
+        
+        // Create a new marker
+        const waypointMarker = L.marker([lat, lng], {
+            draggable: true,
+            title: `Waypoint ${waypointId}`,
+            icon: L.divIcon({
+                html: `<i class="fas fa-map-pin" style="color: #fd7e14; font-size: 20px;"></i>`,
+                iconSize: [30, 30],
+                className: 'custom-div-icon'
+            })
+        }).addTo(map);
+        
+        // Store reference to this marker
+        waypointMarkers.push({
+            id: waypointId,
+            marker: waypointMarker
+        });
+        
+        // Add drag end handler
+        waypointMarker.on('dragend', function() {
+            const newPos = waypointMarker.getLatLng();
+            document.getElementById(waypointId).value = `${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`;
+            clearRoute();
+        });
+        
+        // Clear route when changing waypoint
+        clearRoute();
+    }
+    
+    /**
+     * Remove a waypoint
+     */
+    function removeWaypoint(waypointId) {
+        // Remove marker from map
+        const marker = waypointMarkers.find(m => m.id === waypointId);
+        if (marker) {
+            map.removeLayer(marker.marker);
+            waypointMarkers = waypointMarkers.filter(m => m.id !== waypointId);
+        }
+        
+        // Remove waypoint container from DOM
+        const container = document.getElementById(waypointId + '-container');
+        if (container) {
+            container.remove();
+        }
+        
+        // Disable optimize button if no waypoints remain
+        if (waypointMarkers.length === 0) {
+            document.getElementById('optimizeWaypoints').disabled = true;
+        }
+        
+        // Clear route when removing waypoint
+        clearRoute();
+    }
+    
+    /**
+     * Calculate the route with waypoints
+     */
+    function calculateRoute(optimize = false) {
         // Check if we have both start and end points
         if (!startMarker || !endMarker) {
             alert('Please set both start and end points');
@@ -164,6 +333,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const startLatLng = startMarker.getLatLng();
         const endLatLng = endMarker.getLatLng();
         
+        // Collect waypoints
+        const waypoints = waypointMarkers.map(m => {
+            const pos = m.marker.getLatLng();
+            return [pos.lat, pos.lng];
+        });
+        
         // Fetch route from backend
         fetch('/api/directions', {
             method: 'POST',
@@ -172,7 +347,9 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({
                 start: [startLatLng.lat, startLatLng.lng],
-                end: [endLatLng.lat, endLatLng.lng]
+                end: [endLatLng.lat, endLatLng.lng],
+                waypoints: waypoints,
+                optimize: optimize
             })
         })
         .then(response => {
@@ -392,6 +569,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('startAnimation').disabled = true;
         document.getElementById('pauseAnimation').disabled = true;
         document.getElementById('resetAnimation').disabled = true;
+        
+        // Update optimize button state
+        document.getElementById('optimizeWaypoints').disabled = waypointMarkers.length === 0;
     }
     
     /**
@@ -417,5 +597,169 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             return `${minutes} min`;
         }
+    }
+    
+    /**
+     * Get the user's current location
+     */
+    function getCurrentLocation() {
+        // Check if geolocation is supported by the browser
+        if (!navigator.geolocation) {
+            showLocationError("Twoja przeglądarka nie obsługuje geolokalizacji!");
+            return;
+        }
+        
+        // Show loading state
+        document.getElementById('getCurrentLocation').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        document.getElementById('getCurrentLocation').disabled = true;
+        document.getElementById('locationStatus').textContent = "Ustalanie lokalizacji...";
+        document.getElementById('locationStatus').classList.remove('text-danger', 'text-success');
+        document.getElementById('locationStatus').classList.add('text-info');
+        
+        // Clear any existing watch
+        stopLocationTracking();
+        
+        // Get the current position with high accuracy
+        locationWatchId = navigator.geolocation.watchPosition(
+            // Success callback
+            function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+                
+                // Update location status
+                document.getElementById('locationStatus').textContent = `Lokalizacja znaleziona (dokładność: ${Math.round(accuracy)}m)`;
+                document.getElementById('locationStatus').classList.remove('text-danger', 'text-info');
+                document.getElementById('locationStatus').classList.add('text-success');
+                
+                // Reset button
+                document.getElementById('getCurrentLocation').innerHTML = '<i class="fas fa-location-arrow"></i> Pobierz lokalizację';
+                document.getElementById('getCurrentLocation').disabled = false;
+                
+                // Enable location action buttons
+                document.getElementById('useCurrentLocationStart').disabled = false;
+                document.getElementById('useCurrentLocationEnd').disabled = false;
+                document.getElementById('stopLocationTracking').disabled = false;
+                
+                // Update the map with the current location
+                updateCurrentLocationMarker(lat, lng, accuracy);
+                
+                // Center the map on the current location
+                map.setView([lat, lng], 16);
+            },
+            // Error callback
+            function(error) {
+                // Reset button
+                document.getElementById('getCurrentLocation').innerHTML = '<i class="fas fa-location-arrow"></i> Pobierz lokalizację';
+                document.getElementById('getCurrentLocation').disabled = false;
+                
+                // Disable location action buttons
+                document.getElementById('useCurrentLocationStart').disabled = true;
+                document.getElementById('useCurrentLocationEnd').disabled = true;
+                
+                // Show appropriate error message
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        showLocationError("Odmówiono dostępu do lokalizacji!");
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        showLocationError("Lokalizacja niedostępna!");
+                        break;
+                    case error.TIMEOUT:
+                        showLocationError("Upłynął czas oczekiwania na lokalizację!");
+                        break;
+                    case error.UNKNOWN_ERROR:
+                        showLocationError("Wystąpił nieznany błąd!");
+                        break;
+                }
+            },
+            // Options
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    }
+    
+    /**
+     * Stop tracking the user's location
+     */
+    function stopLocationTracking() {
+        if (locationWatchId !== null) {
+            navigator.geolocation.clearWatch(locationWatchId);
+            locationWatchId = null;
+        }
+        
+        if (currentLocationMarker) {
+            map.removeLayer(currentLocationMarker);
+            currentLocationMarker = null;
+        }
+        
+        // Reset UI
+        document.getElementById('locationStatus').textContent = "Śledzenie lokalizacji zatrzymane";
+        document.getElementById('locationStatus').classList.remove('text-danger', 'text-success', 'text-info');
+        document.getElementById('stopLocationTracking').disabled = true;
+        document.getElementById('useCurrentLocationStart').disabled = true;
+        document.getElementById('useCurrentLocationEnd').disabled = true;
+    }
+    
+    /**
+     * Update the current location marker on the map
+     */
+    function updateCurrentLocationMarker(lat, lng, accuracy) {
+        // Remove existing marker if it exists
+        if (currentLocationMarker) {
+            map.removeLayer(currentLocationMarker);
+        }
+        
+        // Create a new marker
+        currentLocationMarker = L.marker([lat, lng], {
+            title: "Twoja lokalizacja",
+            icon: L.divIcon({
+                html: '<i class="fas fa-dot-circle" style="color: #3498db; font-size: 20px;"></i>',
+                iconSize: [20, 20],
+                className: 'current-location-marker'
+            })
+        }).addTo(map);
+        
+        // Add a circle to show accuracy
+        const accuracyCircle = L.circle([lat, lng], {
+            radius: accuracy,
+            color: '#3498db',
+            fillColor: '#3498db',
+            fillOpacity: 0.15,
+            weight: 1
+        }).addTo(map);
+        
+        // Store the accuracy circle with the marker for later removal
+        currentLocationMarker.accuracyCircle = accuracyCircle;
+    }
+    
+    /**
+     * Use the current location for start or end point
+     */
+    function useCurrentLocationFor(pointType) {
+        if (!currentLocationMarker) {
+            alert('Najpierw pobierz lokalizację!');
+            return;
+        }
+        
+        const currentPos = currentLocationMarker.getLatLng();
+        
+        if (pointType === 'start') {
+            setStartPoint(currentPos.lat, currentPos.lng);
+        } else if (pointType === 'end') {
+            setEndPoint(currentPos.lat, currentPos.lng);
+        }
+    }
+    
+    /**
+     * Show location error message
+     */
+    function showLocationError(message) {
+        document.getElementById('locationStatus').textContent = message;
+        document.getElementById('locationStatus').classList.remove('text-success', 'text-info');
+        document.getElementById('locationStatus').classList.add('text-danger');
     }
 });
