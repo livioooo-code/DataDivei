@@ -13,3 +13,7 @@ gunicorn>=23.0.0
 pytz>=2022.1
 trafilatura>=1.4.0
 weasyprint>=53.0
+cairosvg>=2.5.2
+polyline>=2.0.0
+Pillow>=9.0.0
+astral>=3.0

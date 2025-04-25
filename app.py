@@ -44,5 +44,13 @@ def load_user(user_id):
 with app.app_context():
     # Make sure to import the models here or their tables won't be created
     import models  # noqa: F401
-
-    db.create_all()
+    
+    if os.environ.get('INIT_DB') == '1':
+        # Dla czystej instalacji - usuń wszystkie tabele i utwórz na nowo
+        db.drop_all()
+        db.create_all()
+        app.logger.info("Zainicjalizowano bazę danych od zera.")
+    else:
+        # Standardowe zachowanie - tylko tworzy brakujące tabele
+        db.create_all()
+        app.logger.info("Zaktualizowano strukturę bazy danych.")
