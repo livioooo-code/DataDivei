@@ -1,0 +1,282 @@
+{% extends 'layout.html' %}
+
+{% block title %}Panel Kuriera{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h2 class="card-title">Witaj, {{ current_user.username }}</h2>
+                    <p class="card-text text-muted">Status: 
+                        <span id="courier-status-badge" class="badge {% if courier.status == 'online' %}bg-success{% elif courier.status == 'busy' %}bg-warning{% else %}bg-secondary{% endif %}">
+                            {% if courier.status == 'online' %}Dostępny{% elif courier.status == 'busy' %}Zajęty{% else %}Niedostępny{% endif %}
+                        </span>
+                    </p>
+                    
+                    <div class="btn-group mt-2" role="group">
+                        <button type="button" class="btn btn-success btn-sm status-btn" data-status="online">Dostępny</button>
+                        <button type="button" class="btn btn-warning btn-sm status-btn" data-status="busy">Zajęty</button>
+                        <button type="button" class="btn btn-secondary btn-sm status-btn" data-status="offline">Niedostępny</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h4 class="card-title mb-3">Twoje statystyki</h4>
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <div class="card bg-light">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title">Dostarczone</h6>
+                                    <h3 class="card-text">{{ total_delivered }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="card bg-light">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title">Aktywne</h6>
+                                    <h3 class="card-text">{{ assigned_deliveries|length }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Dzisiejsze dostawy</h4>
+                    <a href="{{ url_for('courier_deliveries') }}" class="btn btn-outline-primary btn-sm">Wszystkie dostawy</a>
+                </div>
+                <div class="card-body">
+                    {% if today_deliveries %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Odbiorca</th>
+                                        <th>Adres dostawy</th>
+                                        <th>Status</th>
+                                        <th>Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for delivery in today_deliveries %}
+                                        <tr>
+                                            <td>{{ delivery.id }}</td>
+                                            <td>{{ delivery.recipient_name }}</td>
+                                            <td>{{ delivery.delivery_address }}</td>
+                                            <td>
+                                                <span class="badge {% if delivery.status == 'delivered' %}bg-success{% elif delivery.status == 'in_progress' %}bg-primary{% elif delivery.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                                    {{ delivery.status }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('courier_delivery_details', delivery_id=delivery.id) }}" class="btn btn-sm btn-primary">Szczegóły</a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="mb-0 text-center py-3">Brak dostaw zaplanowanych na dzisiaj.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h4 class="mb-0">Szybkie akcje</h4>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <a href="{{ url_for('courier_profile') }}" class="btn btn-outline-primary">Edytuj profil kuriera</a>
+                        <a href="{{ url_for('available_deliveries') }}" class="btn btn-outline-success">Znajdź nowe dostawy do realizacji</a>
+                        <button class="btn btn-outline-info" id="refresh-location">Aktualizuj lokalizację</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h4 class="mb-0">Aktywne dostawy</h4>
+                </div>
+                <div class="card-body">
+                    {% if assigned_deliveries|selectattr('status', 'in', ['assigned', 'in_progress', 'picked_up', 'in_transit', 'out_for_delivery'])|list %}
+                        <ul class="list-group">
+                            {% for delivery in assigned_deliveries|selectattr('status', 'in', ['assigned', 'in_progress', 'picked_up', 'in_transit', 'out_for_delivery'])|list %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="fw-bold">#{{ delivery.id }}</span> - {{ delivery.recipient_name }}<br>
+                                        <small class="text-muted">{{ delivery.delivery_address }}</small>
+                                    </div>
+                                    <a href="{{ url_for('courier_delivery_details', delivery_id=delivery.id) }}" class="btn btn-sm btn-primary">Szczegóły</a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="mb-0 text-center py-3">Nie masz aktywnych dostaw.</p>
+                        <div class="d-grid gap-2 mt-3">
+                            <a href="{{ url_for('available_deliveries') }}" class="btn btn-primary">Szukaj dostaw</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Obsługa przycisków zmiany statusu
+    const statusButtons = document.querySelectorAll('.status-btn');
+    statusButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const status = this.getAttribute('data-status');
+            updateCourierStatus(status);
+        });
+    });
+
+    // Obsługa przycisku aktualizacji lokalizacji
+    const refreshLocation = document.getElementById('refresh-location');
+    if (refreshLocation) {
+        refreshLocation.addEventListener('click', function() {
+            if (navigator.geolocation) {
+                refreshLocation.disabled = true;
+                refreshLocation.textContent = 'Lokalizowanie...';
+                
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        updateCourierLocation(lat, lng);
+                    },
+                    function(error) {
+                        console.error("Błąd geolokalizacji:", error);
+                        refreshLocation.textContent = 'Nie udało się pobrać lokalizacji';
+                        setTimeout(() => {
+                            refreshLocation.disabled = false;
+                            refreshLocation.textContent = 'Aktualizuj lokalizację';
+                        }, 2000);
+                    }
+                );
+            } else {
+                alert("Geolokalizacja nie jest obsługiwana przez twoją przeglądarkę.");
+            }
+        });
+    }
+
+    // Funkcja aktualizacji statusu kuriera
+    function updateCourierStatus(status) {
+        fetch('{{ url_for("update_courier_status") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: status }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Aktualizacja UI
+                const statusBadge = document.getElementById('courier-status-badge');
+                statusBadge.className = 'badge';
+                
+                if (status === 'online') {
+                    statusBadge.classList.add('bg-success');
+                    statusBadge.textContent = 'Dostępny';
+                } else if (status === 'busy') {
+                    statusBadge.classList.add('bg-warning');
+                    statusBadge.textContent = 'Zajęty';
+                } else {
+                    statusBadge.classList.add('bg-secondary');
+                    statusBadge.textContent = 'Niedostępny';
+                }
+                
+                // Opcjonalnie: pokaż powiadomienie o sukcesie
+                showToast('Status zaktualizowany', 'success');
+            } else {
+                showToast('Błąd: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Wystąpił błąd podczas aktualizacji statusu', 'danger');
+        });
+    }
+
+    // Funkcja aktualizacji lokalizacji kuriera
+    function updateCourierLocation(lat, lng) {
+        fetch('{{ url_for("update_courier_status") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                status: document.getElementById('courier-status-badge').textContent.trim() === 'Dostępny' ? 'online' : 
+                          document.getElementById('courier-status-badge').textContent.trim() === 'Zajęty' ? 'busy' : 'offline',
+                lat: lat,
+                lng: lng
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Lokalizacja zaktualizowana', 'success');
+            } else {
+                showToast('Błąd: ' + data.error, 'danger');
+            }
+            
+            // Reaktywuj przycisk
+            refreshLocation.disabled = false;
+            refreshLocation.textContent = 'Aktualizuj lokalizację';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Wystąpił błąd podczas aktualizacji lokalizacji', 'danger');
+            
+            // Reaktywuj przycisk
+            refreshLocation.disabled = false;
+            refreshLocation.textContent = 'Aktualizuj lokalizację';
+        });
+    }
+
+    // Pomocnicza funkcja do wyświetlania powiadomień
+    function showToast(message, type) {
+        // Tutaj możesz zaimplementować wyświetlanie powiadomień
+        // zgodnie z wybraną biblioteką lub natywnym rozwiązaniem
+        alert(message);
+    }
+});
+</script>
+{% endblock %}
