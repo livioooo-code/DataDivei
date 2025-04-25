@@ -14,6 +14,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentRouteData = null; // Store the current route data
     let routeSegmentLayers = []; // Store route segments with traffic colors
     let currentRouteId = null; // Current route ID for traffic updates
+    let animationEffects = ['bounce', 'pulse', 'car', 'motorcycle', 'bicycle']; // Animation effect types
+    let currentAnimationEffect = 'car'; // Default animation effect
+    let animationTrail = []; // Trail effect markers
+    let achievementUnlocked = false; // For achievement animations
+    let speedMilestones = []; // Track speed milestones for achievements
     
     // Initialize map centered on a default location
     initMap();
@@ -812,6 +817,24 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pauseAnimation').disabled = false;
         isAnimationRunning = true;
         
+        // Reset animation trail markers
+        clearAnimationTrail();
+        
+        // Reset milestone achievements if animating from the beginning
+        if (currentAnimationIndex === 0) {
+            speedMilestones = [];
+        }
+        
+        // Create moving marker if it doesn't exist yet
+        if (!movingMarker) {
+            // Create a moving marker to show the animation progress
+            const startPos = routeCoordinates[currentAnimationIndex];
+            movingMarker = L.marker(startPos, {
+                icon: getVehicleIcon(currentAnimationEffect),
+                zIndexOffset: 1000
+            }).addTo(map);
+        }
+        
         // Get animation speed
         const speed = Number(document.getElementById('animationSpeed').value);
         
@@ -823,6 +846,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Check if we've reached the end
             if (currentAnimationIndex >= routeCoordinates.length - 1) {
                 pauseAnimation();
+                showAchievement("Ukończono trasę! 🎉");
                 return;
             }
             
@@ -875,12 +899,279 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update marker position
         const currentPos = routeCoordinates[currentAnimationIndex];
-        movingMarker.setLatLng(currentPos);
+        
+        // Apply current animation effect
+        applyAnimationEffect(currentPos);
+        
+        // Check for progress milestones
+        checkProgressMilestones();
         
         // Follow animation if enabled
         if (document.getElementById('followAnimation').checked) {
             map.panTo(currentPos);
         }
+    }
+    
+    /**
+     * Apply the current animation effect to the moving marker
+     */
+    function applyAnimationEffect(position) {
+        // Update marker position first
+        movingMarker.setLatLng(position);
+        
+        // Apply the selected animation effect
+        switch(currentAnimationEffect) {
+            case 'bounce':
+                applyBounceEffect(movingMarker);
+                break;
+            case 'pulse':
+                applyPulseEffect(movingMarker);
+                break;
+            case 'car':
+                applyCarEffect(position);
+                break;
+            case 'motorcycle':
+                applyMotorcycleEffect(position);
+                break;
+            case 'bicycle':
+                applyBicycleEffect(position);
+                break;
+            default:
+                // Default behavior - just update position
+                break;
+        }
+        
+        // Update the trail effect if using car/motorcycle/bicycle
+        if (['car', 'motorcycle', 'bicycle'].includes(currentAnimationEffect)) {
+            updateAnimationTrail(position);
+        }
+    }
+    
+    /**
+     * Apply bounce effect to the marker
+     */
+    function applyBounceEffect(marker) {
+        // Get the marker element
+        const markerElement = marker.getElement();
+        
+        // Remove any existing animation classes
+        markerElement.classList.remove('marker-pulse', 'marker-bounce');
+        
+        // Force a DOM reflow (required for CSS animations to restart)
+        void markerElement.offsetWidth;
+        
+        // Add the bounce animation class
+        markerElement.classList.add('marker-bounce');
+    }
+    
+    /**
+     * Apply pulse effect to the marker
+     */
+    function applyPulseEffect(marker) {
+        // Get the marker element
+        const markerElement = marker.getElement();
+        
+        // Remove any existing animation classes
+        markerElement.classList.remove('marker-pulse', 'marker-bounce');
+        
+        // Force a DOM reflow (required for CSS animations to restart)
+        void markerElement.offsetWidth;
+        
+        // Add the pulse animation class
+        markerElement.classList.add('marker-pulse');
+    }
+    
+    /**
+     * Apply car effect (custom icon with trail)
+     */
+    function applyCarEffect(position) {
+        // Update marker icon if needed
+        if (movingMarker.getIcon().options.html !== '<i class="fas fa-car"></i>') {
+            movingMarker.setIcon(L.divIcon({
+                html: '<i class="fas fa-car"></i>',
+                iconSize: [30, 30],
+                className: 'vehicle-icon-container'
+            }));
+        }
+    }
+    
+    /**
+     * Apply motorcycle effect (custom icon with trail)
+     */
+    function applyMotorcycleEffect(position) {
+        // Update marker icon if needed
+        if (movingMarker.getIcon().options.html !== '<i class="fas fa-motorcycle"></i>') {
+            movingMarker.setIcon(L.divIcon({
+                html: '<i class="fas fa-motorcycle"></i>',
+                iconSize: [30, 30],
+                className: 'vehicle-icon-container'
+            }));
+        }
+    }
+    
+    /**
+     * Apply bicycle effect (custom icon with trail)
+     */
+    function applyBicycleEffect(position) {
+        // Update marker icon if needed
+        if (movingMarker.getIcon().options.html !== '<i class="fas fa-bicycle"></i>') {
+            movingMarker.setIcon(L.divIcon({
+                html: '<i class="fas fa-bicycle"></i>',
+                iconSize: [30, 30],
+                className: 'vehicle-icon-container'
+            }));
+        }
+    }
+    
+    /**
+     * Update the animation trail behind the moving marker
+     */
+    function updateAnimationTrail(position) {
+        // Add a new trail marker
+        const trailMarker = L.circleMarker(position, {
+            radius: 3,
+            color: getTrailColor(),
+            fillColor: getTrailColor(),
+            fillOpacity: 0.7,
+            weight: 1
+        }).addTo(map);
+        
+        // Add to the trail array
+        animationTrail.push({
+            marker: trailMarker,
+            timestamp: Date.now()
+        });
+        
+        // Limit trail length and fade out old trail markers
+        manageTrailMarkers();
+    }
+    
+    /**
+     * Manage trail markers (remove old ones, fade others)
+     */
+    function manageTrailMarkers() {
+        const now = Date.now();
+        const maxTrailAge = 10000; // 10 seconds
+        const maxTrailSize = 50;
+        
+        // Remove old trail markers
+        while (animationTrail.length > 0 && 
+               (now - animationTrail[0].timestamp > maxTrailAge || animationTrail.length > maxTrailSize)) {
+            map.removeLayer(animationTrail[0].marker);
+            animationTrail.shift();
+        }
+        
+        // Update opacity of remaining trail markers based on age
+        animationTrail.forEach((item, index) => {
+            const age = now - item.timestamp;
+            const opacity = Math.max(0.1, 1 - (age / maxTrailAge));
+            item.marker.setStyle({ fillOpacity: opacity, opacity: opacity });
+        });
+    }
+    
+    /**
+     * Get color for trail markers based on current effect
+     */
+    function getTrailColor() {
+        switch(currentAnimationEffect) {
+            case 'car':
+                return '#3388ff'; // Blue
+            case 'motorcycle':
+                return '#ff4d4d'; // Red
+            case 'bicycle':
+                return '#4dff4d'; // Green
+            default:
+                return '#ffbb33'; // Orange
+        }
+    }
+    
+    /**
+     * Clear all animation trail markers
+     */
+    function clearAnimationTrail() {
+        // Remove all trail markers from the map
+        animationTrail.forEach(item => {
+            map.removeLayer(item.marker);
+        });
+        
+        // Clear the array
+        animationTrail = [];
+    }
+    
+    /**
+     * Get the appropriate vehicle icon based on effect type
+     */
+    function getVehicleIcon(effect) {
+        let html = '<i class="fas fa-map-marker-alt"></i>';
+        
+        switch(effect) {
+            case 'car':
+                html = '<i class="fas fa-car"></i>';
+                break;
+            case 'motorcycle':
+                html = '<i class="fas fa-motorcycle"></i>';
+                break;
+            case 'bicycle':
+                html = '<i class="fas fa-bicycle"></i>';
+                break;
+            case 'bounce':
+            case 'pulse':
+                html = '<i class="fas fa-circle"></i>';
+                break;
+        }
+        
+        return L.divIcon({
+            html: html,
+            iconSize: [30, 30],
+            className: 'vehicle-icon-container'
+        });
+    }
+    
+    /**
+     * Check for progress milestones and trigger achievements
+     */
+    function checkProgressMilestones() {
+        if (!routeCoordinates.length) return;
+        
+        // Calculate progress percentage
+        const progress = (currentAnimationIndex / (routeCoordinates.length - 1)) * 100;
+        
+        // Define milestone percentages
+        const milestones = [25, 50, 75, 100];
+        
+        // Check each milestone
+        milestones.forEach(milestone => {
+            if (progress >= milestone && !speedMilestones.includes(milestone)) {
+                // Add to reached milestones
+                speedMilestones.push(milestone);
+                
+                // Show achievement notification
+                showAchievement(`Osiągnięto ${milestone}% trasy!`);
+            }
+        });
+    }
+    
+    /**
+     * Show achievement notification
+     */
+    function showAchievement(message) {
+        // Create achievement notification element if it doesn't exist
+        let achievementEl = document.getElementById('achievement-notification');
+        if (!achievementEl) {
+            achievementEl = document.createElement('div');
+            achievementEl.id = 'achievement-notification';
+            achievementEl.className = 'achievement-notification';
+            document.body.appendChild(achievementEl);
+        }
+        
+        // Update message and show animation
+        achievementEl.textContent = message;
+        achievementEl.classList.add('show-achievement');
+        
+        // Remove animation class after animation completes
+        setTimeout(() => {
+            achievementEl.classList.remove('show-achievement');
+        }, 3000); // Match this to the CSS animation duration
     }
     
     /**
