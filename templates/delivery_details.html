@@ -123,6 +123,56 @@
                                 </tr>
                             </table>
                             
+                            <h6 class="mt-4">Informacje o płatności</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th style="width: 40%">Cena:</th>
+                                    <td>
+                                        {% if delivery.price %}
+                                            {{ "%.2f"|format(delivery.price) }} PLN
+                                        {% else %}
+                                            Nie określono
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Metoda płatności:</th>
+                                    <td>
+                                        {% if delivery.payment_method == 'cash' %}
+                                            <span class="badge bg-success">Gotówka przy odbiorze</span>
+                                        {% elif delivery.payment_method == 'card' %}
+                                            <span class="badge bg-info">Karta przy odbiorze</span>
+                                        {% elif delivery.payment_method == 'online' %}
+                                            <span class="badge bg-primary">Płatność online</span>
+                                        {% elif delivery.payment_method == 'invoice' %}
+                                            <span class="badge bg-warning">Faktura</span>
+                                        {% else %}
+                                            {{ delivery.payment_method }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Status płatności:</th>
+                                    <td>
+                                        {% if delivery.payment_status == 'pending' %}
+                                            <span class="badge bg-warning">Oczekuje na płatność</span>
+                                        {% elif delivery.payment_status == 'paid' %}
+                                            <span class="badge bg-success">Opłacone</span>
+                                        {% elif delivery.payment_status == 'failed' %}
+                                            <span class="badge bg-danger">Nieudana</span>
+                                        {% elif delivery.payment_status == 'refunded' %}
+                                            <span class="badge bg-info">Zwrócone</span>
+                                        {% else %}
+                                            {{ delivery.payment_status }}
+                                        {% endif %}
+                                        
+                                        {% if delivery.paid_at %}
+                                            <br><small class="text-muted">Opłacono: {{ delivery.paid_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                            
                             <h6 class="mt-3">Adres odbioru</h6>
                             <p>{{ delivery.pickup_address }}</p>
                             

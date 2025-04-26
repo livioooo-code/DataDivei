@@ -789,7 +789,10 @@ def create_delivery():
                 delivery_lng=form.delivery_lng.data,
                 estimated_delivery_time=form.estimated_delivery_time.data,
                 notes=form.notes.data,
-                status='new'
+                status='new',
+                price=form.price.data,
+                payment_method=form.payment_method.data,
+                payment_status='pending'
             )
             
             db.session.add(new_delivery)
