@@ -101,6 +101,18 @@ class DeliveryForm(FlaskForm):
     notes = TextAreaField('Uwagi', validators=[Optional()])
     route_id = HiddenField('ID Trasy')
     
+    # Pola płatności
+    price = FloatField('Cena dostawy (PLN)', validators=[
+        Optional(),
+        NumberRange(min=0, message='Cena musi być większa lub równa 0')
+    ])
+    payment_method = SelectField('Metoda płatności', choices=[
+        ('cash', 'Gotówka przy odbiorze'),
+        ('card', 'Karta przy odbiorze'),
+        ('online', 'Płatność online'),
+        ('invoice', 'Faktura (płatność przelewem)')
+    ], default='cash')
+    
     submit = SubmitField('Utwórz dostawę')
 
 # Formularz aktualizacji statusu dostawy

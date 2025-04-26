@@ -198,6 +198,50 @@
                             </div>
                         </div>
                         
+                        <h5 class="mb-3">Informacje o płatności</h5>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.price.label(class="form-label") }}
+                                    {{ form.price(class="form-control", type="number", step="0.01", min="0") }}
+                                    <div class="form-text">Podaj cenę dostawy w złotych.</div>
+                                    {% if form.price.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.price.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.payment_method.label(class="form-label") }}
+                                    {{ form.payment_method(class="form-select") }}
+                                    <div class="form-text">Wybierz preferowaną metodę płatności.</div>
+                                    {% if form.payment_method.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.payment_method.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div id="payment-info" class="alert alert-info mt-2" style="display: none;">
+                                    <div id="cash-info">
+                                        <i class="bi bi-cash"></i> <strong>Gotówka przy odbiorze:</strong> Płatność zostanie pobrana przez kuriera w momencie dostarczenia przesyłki.
+                                    </div>
+                                    <div id="card-info" style="display: none;">
+                                        <i class="bi bi-credit-card"></i> <strong>Karta przy odbiorze:</strong> Kurier będzie posiadał terminal płatniczy do obsługi płatności kartą.
+                                    </div>
+                                    <div id="online-info" style="display: none;">
+                                        <i class="bi bi-laptop"></i> <strong>Płatność online:</strong> Po utworzeniu zlecenia zostaniesz przekierowany do strony płatności.
+                                    </div>
+                                    <div id="invoice-info" style="display: none;">
+                                        <i class="bi bi-file-earmark-text"></i> <strong>Faktura:</strong> Faktura zostanie wystawiona po realizacji dostawy z 14-dniowym terminem płatności.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="d-flex justify-content-between">
                             <a href="{{ url_for('delivery_marketplace') }}" class="btn btn-secondary">
                                 <i class="bi bi-arrow-left"></i> Anuluj

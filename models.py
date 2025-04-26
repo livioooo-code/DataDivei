@@ -136,6 +136,13 @@ class Delivery(db.Model):
     notes = db.Column(db.Text, nullable=True)
     delivery_photo = db.Column(db.String(255), nullable=True)  # Opcjonalnie: zdjęcie potwierdzające dostarczenie
     
+    # Płatności
+    price = db.Column(db.Float, nullable=True)  # Cena dostawy
+    payment_method = db.Column(db.String(50), default='cash')  # cash, card, online, invoice
+    payment_status = db.Column(db.String(50), default='pending')  # pending, paid, failed, refunded
+    payment_id = db.Column(db.String(255), nullable=True)  # ID transakcji płatności (dla płatności online)
+    paid_at = db.Column(db.DateTime, nullable=True)  # Kiedy zapłacono
+    
     def __repr__(self):
         return f'<Delivery {self.id} - {self.status}>'
         
@@ -159,7 +166,11 @@ class Delivery(db.Model):
             'delivery_time': self.delivery_time.isoformat() if self.delivery_time else None,
             'estimated_delivery_time': self.estimated_delivery_time.isoformat() if self.estimated_delivery_time else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'price': self.price,
+            'payment_method': self.payment_method,
+            'payment_status': self.payment_status,
+            'paid_at': self.paid_at.isoformat() if self.paid_at else None
         }
 
 # Association table for user's saved routes
