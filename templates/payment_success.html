@@ -1,0 +1,35 @@
+{% extends 'layout.html' %}
+
+{% block title %}Płatność zrealizowana{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow text-center">
+                <div class="card-body py-5">
+                    <div class="mb-4">
+                        <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
+                    </div>
+                    <h2 class="card-title mb-3">Płatność zrealizowana</h2>
+                    <p class="card-text mb-4">
+                        Twoja płatność została zrealizowana pomyślnie. Dziękujemy za skorzystanie z naszych usług!
+                    </p>
+                    <p class="text-muted mb-4">
+                        Na Twój adres email zostało wysłane potwierdzenie płatności.
+                    </p>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('delivery_details', delivery_id=delivery_id) }}" class="btn btn-primary">
+                            <i class="bi bi-box"></i> Wróć do szczegółów dostawy
+                        </a>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-house"></i> Przejdź do panelu głównego
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

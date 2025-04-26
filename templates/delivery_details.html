@@ -173,6 +173,15 @@
                                 </tr>
                             </table>
                             
+                            <!-- Przycisk do płatności online -->
+                            {% if delivery.payment_method == 'online' and delivery.payment_status == 'pending' and not current_user.is_courier %}
+                            <div class="d-grid mt-3 mb-3">
+                                <a href="{{ url_for('payment_checkout', delivery_id=delivery.id) }}" class="btn btn-primary">
+                                    <i class="bi bi-credit-card"></i> Zapłać online
+                                </a>
+                            </div>
+                            {% endif %}
+                            
                             <h6 class="mt-3">Adres odbioru</h6>
                             <p>{{ delivery.pickup_address }}</p>
                             

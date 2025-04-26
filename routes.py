@@ -935,3 +935,116 @@ def delivery_marketplace():
         deliveries=deliveries,
         filter_form=filter_form
     )
+
+# ======== Funkcje obsługi płatności ========
+
+@app.route('/payment/checkout/<int:delivery_id>')
+@login_required
+def payment_checkout(delivery_id):
+    """Przekierowanie do strony płatności Stripe dla danej dostawy."""
+    delivery = Delivery.query.get_or_404(delivery_id)
+    
+    # Sprawdź, czy użytkownik ma uprawnienia do płatności za tę dostawę
+    route = Route.query.get(delivery.route_id)
+    if route not in current_user.routes:
+        flash('Nie masz uprawnień do opłacenia tej dostawy.', 'danger')
+        return redirect(url_for('delivery_details', delivery_id=delivery_id))
+    
+    # Sprawdź, czy płatność online jest wybrana dla tej dostawy
+    if delivery.payment_method != 'online':
+        flash('Ta dostawa nie jest oznaczona do płatności online.', 'warning')
+        return redirect(url_for('delivery_details', delivery_id=delivery_id))
+    
+    # Sprawdź, czy dostawa nie została już opłacona
+    if delivery.payment_status == 'paid':
+        flash('Ta dostawa została już opłacona.', 'info')
+        return redirect(url_for('delivery_details', delivery_id=delivery_id))
+    
+    # Sprawdź, czy ustawiono cenę
+    if not delivery.price or delivery.price <= 0:
+        flash('Nie można opłacić dostawy bez ustalonej ceny.', 'danger')
+        return redirect(url_for('delivery_details', delivery_id=delivery_id))
+    
+    # Utwórz sesję płatności w Stripe
+    checkout_url = create_checkout_session(delivery)
+    
+    if not checkout_url:
+        flash('Wystąpił błąd podczas tworzenia sesji płatności. Spróbuj ponownie później.', 'danger')
+        return redirect(url_for('delivery_details', delivery_id=delivery_id))
+    
+    # Przekieruj do strony płatności Stripe
+    return redirect(checkout_url)
+
+@app.route('/payment/success/<int:delivery_id>')
+@login_required
+def payment_success(delivery_id):
+    """Obsługa powrotu z udanej płatności Stripe."""
+    delivery = Delivery.query.get_or_404(delivery_id)
+    
+    # Pobierz identyfikator sesji z parametrów URL
+    session_id = request.args.get('session_id')
+    
+    if not session_id:
+        flash('Brak identyfikatora sesji płatności.', 'warning')
+        return redirect(url_for('delivery_details', delivery_id=delivery_id))
+    
+    try:
+        # Pobierz informacje o sesji z Stripe
+        session = stripe.checkout.Session.retrieve(session_id)
+        
+        # Pobierz identyfikator płatności
+        payment_intent = session.payment_intent
+        
+        # Oznacz dostawę jako opłaconą
+        if mark_delivery_as_paid(delivery, payment_intent):
+            flash('Płatność została zrealizowana pomyślnie!', 'success')
+        else:
+            flash('Wystąpił błąd podczas aktualizacji statusu płatności.', 'warning')
+    except Exception as e:
+        app.logger.error(f"Błąd weryfikacji płatności: {str(e)}")
+        flash('Wystąpił błąd podczas weryfikacji płatności.', 'danger')
+    
+    return render_template('payment_success.html', delivery_id=delivery_id)
+
+@app.route('/payment/cancel/<int:delivery_id>')
+@login_required
+def payment_cancel(delivery_id):
+    """Obsługa powrotu z anulowanej płatności Stripe."""
+    flash('Płatność została anulowana.', 'warning')
+    return render_template('payment_cancel.html', delivery_id=delivery_id)
+
+@app.route('/payment/webhook', methods=['POST'])
+def payment_webhook():
+    """Webhook dla powiadomień o płatnościach z Stripe."""
+    payload = request.get_data()
+    sig_header = request.headers.get('Stripe-Signature')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+        )
+    except ValueError as e:
+        # Nieprawidłowe dane żądania
+        app.logger.error(f"Błąd webhookn - nieprawidłowe dane: {str(e)}")
+        return jsonify({'error': 'Nieprawidłowe dane żądania'}), 400
+    except stripe.error.SignatureVerificationError as e:
+        # Nieprawidłowy podpis
+        app.logger.error(f"Błąd webhook - nieprawidłowy podpis: {str(e)}")
+        return jsonify({'error': 'Nieprawidłowy podpis'}), 400
+    
+    # Obsługa zdarzenia typu payment_intent.succeeded
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        
+        # Znajdź dostawę powiązaną z tą płatnością
+        delivery = Delivery.query.filter_by(payment_id=payment_intent['id']).first()
+        
+        if delivery:
+            # Zaktualizuj status płatności
+            delivery.payment_status = 'paid'
+            delivery.paid_at = datetime.utcnow()
+            db.session.commit()
+            
+            app.logger.info(f"Płatność oznaczona jako zrealizowana dla dostawy #{delivery.id}")
+    
+    return jsonify({'status': 'success'}), 200
