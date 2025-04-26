@@ -63,6 +63,31 @@
                             </a>
                         </li>
                         
+                        {% if not current_user.is_courier %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="deliveryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-box me-1"></i> Dostawy
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="deliveryDropdown">
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('create_delivery') }}">
+                                            <i class="fas fa-plus me-1"></i> Nowe zlecenie
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('user_deliveries') }}">
+                                            <i class="fas fa-list me-1"></i> Moje zlecenia
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('delivery_marketplace') }}">
+                                            <i class="fas fa-store me-1"></i> Giełda zleceń
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                        {% endif %}
+                        
                         {% if current_user.is_courier %}
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="courierDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
