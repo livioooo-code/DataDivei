@@ -5,9 +5,9 @@ import polyline
 import stripe
 from datetime import datetime
 from urllib.parse import urlparse
-from flask import render_template, request, jsonify, url_for, redirect, flash
+from flask import render_template, request, jsonify, url_for, redirect, flash, make_response
 from flask_login import login_user, logout_user, login_required, current_user
-from app import app, db
+from app import app, db, csrf
 from models import Route, User, user_routes, Courier, Delivery, DeliveryStatusHistory
 from werkzeug.security import generate_password_hash, check_password_hash
 from payments import create_checkout_session, check_payment_status, mark_delivery_as_paid
@@ -33,6 +33,12 @@ def service_worker():
 def offline():
     """Render the offline page."""
     return render_template('offline.html')
+
+@app.route('/csrf-token')
+def get_csrf_token():
+    """Endpoint do odświeżania tokenu CSRF."""
+    response = make_response(jsonify({'status': 'success'}))
+    return response
 
 # ======== Funkcje dla kurierów ========
 

@@ -22,6 +22,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)  # needed for url_for
 
 # Inicjalizacja ochrony CSRF
 csrf = CSRFProtect(app)
+app.config['WTF_CSRF_TIME_LIMIT'] = 3600 * 8  # Zwiększenie czasu ważności tokenu CSRF do 8 godzin
 
 # Configure the database
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
