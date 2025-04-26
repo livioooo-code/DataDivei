@@ -17,3 +17,4 @@ cairosvg>=2.5.2
 polyline>=2.0.0
 Pillow>=9.0.0
 astral>=3.0
+stripe
