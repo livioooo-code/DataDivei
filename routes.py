@@ -137,7 +137,19 @@ def dashboard():
         )
     else:
         # Dla zwykłego użytkownika
-        return render_template('user_dashboard.html')
+        # Pobierz aktywne trasy użytkownika
+        user_routes = current_user.routes
+        
+        # Pobierz dostawy utworzone przez użytkownika
+        user_deliveries = Delivery.query.join(Route).join(user_routes).filter(
+            Route.id == Delivery.route_id
+        ).order_by(Delivery.created_at.desc()).limit(5).all()
+        
+        return render_template(
+            'user_dashboard.html',
+            user_routes=user_routes,
+            user_deliveries=user_deliveries
+        )
 
 @app.route('/courier/profile', methods=['GET', 'POST'])
 @login_required
@@ -358,6 +370,9 @@ def available_deliveries():
         return redirect(url_for('dashboard'))
     
     courier = Courier.query.filter_by(user_id=current_user.id).first()
+    if not courier:
+        flash('Nie znaleziono profilu kuriera.', 'danger')
+        return redirect(url_for('dashboard'))
     
     # Pobierz nieprzypisane dostawy
     available_deliveries = Delivery.query.filter_by(status='new', courier_id=None).all()
