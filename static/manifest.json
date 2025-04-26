@@ -3,10 +3,29 @@
   "short_name": "RouteGuide",
   "description": "Aplikacja do wizualizacji i animacji tras na mapie",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#212529",
   "theme_color": "#212529",
   "orientation": "any",
+  "categories": ["navigation", "maps", "transport"],
+  "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "/static/screenshots/screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mapa",
+      "short_name": "Mapa",
+      "description": "Otwórz mapę",
+      "url": "/?source=pwa",
+      "icons": [{ "src": "/static/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     {
       "src": "/static/icons/icon-192x192.png",

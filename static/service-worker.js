@@ -1,9 +1,13 @@
 // Nazwa cache dla aplikacji
-const CACHE_NAME = 'route-guidance-v1';
+const CACHE_NAME = 'route-guidance-v2';
+
+// Plik do wyświetlania w trybie offline
+const OFFLINE_URL = '/offline.html';
 
 // Lista plików do zapisania w cache
 const CACHE_URLS = [
   '/',
+  '/offline.html',
   '/static/css/styles.css',
   '/static/js/map.js',
   '/static/icons/icon-192x192.png',
@@ -89,8 +93,8 @@ self.addEventListener('fetch', (event) => {
         .catch((error) => {
           console.error('Fetch failed:', error);
           // Dla żądań do plików HTML, w przypadku błędu zwróć stronę offline
-          if (event.request.headers.get('Accept').includes('text/html')) {
-            return caches.match('/');
+          if (event.request.headers.get('Accept') && event.request.headers.get('Accept').includes('text/html')) {
+            return caches.match(OFFLINE_URL);
           }
         })
     );

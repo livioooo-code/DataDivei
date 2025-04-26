@@ -27,6 +27,10 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+# Konfiguracja PWA
+app.config["PWA_ENABLED"] = True  # Włączenie wsparcia PWA
+app.config["PWA_MANIFEST_PATH"] = "/static/manifest.json"
+
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)

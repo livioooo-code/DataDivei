@@ -24,6 +24,11 @@ def service_worker():
     """Serve the service worker file with proper MIME type."""
     return app.send_static_file('service-worker.js'), 200, {'Content-Type': 'application/javascript'}
 
+@app.route('/offline.html')
+def offline():
+    """Render the offline page."""
+    return render_template('offline.html')
+
 # ======== Funkcje dla kurierów ========
 
 @app.route('/login', methods=['GET', 'POST'])
