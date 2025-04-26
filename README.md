@@ -1,6 +1,6 @@
-# Courier Navigation System (PWA)
+# Courier Navigation System 
 
-Kompleksowy system nawigacyjny dla kurierów, dostępny jako aplikacja Progressive Web App (PWA).
+Kompleksowy system nawigacyjny dla kurierów, 
 
 ## Funkcje
 
