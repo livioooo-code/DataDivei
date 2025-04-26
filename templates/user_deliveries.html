@@ -1,0 +1,264 @@
+{% extends 'layout.html' %}
+
+{% block title %}Moje zlecenia dostaw{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-0">Moje zlecenia dostaw</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('create_delivery') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Utwórz nowe zlecenie
+            </a>
+        </div>
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+    
+    <div class="card shadow mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Filtry wyszukiwania</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('user_deliveries') }}">
+                <div class="row">
+                    <div class="col-md-3">
+                        {{ filter_form.status.label(class="form-label") }}
+                        {{ filter_form.status(class="form-select") }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ filter_form.date_from.label(class="form-label") }}
+                        {{ filter_form.date_from(class="form-control", type="date") }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ filter_form.date_to.label(class="form-label") }}
+                        {{ filter_form.date_to(class="form-control", type="date") }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ filter_form.search.label(class="form-label") }}
+                        {{ filter_form.search(class="form-control", placeholder="Szukaj...") }}
+                    </div>
+                    <div class="col-12 text-end mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-funnel"></i> Filtruj
+                        </button>
+                        <a href="{{ url_for('user_deliveries') }}" class="btn btn-outline-secondary">Wyczyść</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="row" id="mapSection" style="display: none;">
+        <div class="col-12 mb-4">
+            <div class="card shadow">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Mapa zleceń</h5>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="hideMap">
+                        <i class="bi bi-x-lg"></i> Zamknij mapę
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="delivery-map" style="height: 500px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card shadow">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Lista moich zleceń</h5>
+            <div>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="showOnMap">
+                    <i class="bi bi-map"></i> Pokaż na mapie
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="refreshData" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i> Odśwież
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if deliveries %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Status</th>
+                                <th>Odbiorca</th>
+                                <th>Adres dostawy</th>
+                                <th>Utworzono</th>
+                                <th>Szac. dostarczenie</th>
+                                <th>Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for delivery in deliveries %}
+                                <tr>
+                                    <td>{{ delivery.id }}</td>
+                                    <td>
+                                        {% if delivery.status == 'new' %}
+                                            <span class="badge bg-info">Nowe</span>
+                                        {% elif delivery.status == 'assigned' %}
+                                            <span class="badge bg-primary">Przypisane</span>
+                                        {% elif delivery.status == 'in_progress' %}
+                                            <span class="badge bg-warning">W realizacji</span>
+                                        {% elif delivery.status == 'picked_up' %}
+                                            <span class="badge bg-warning">Odebrane</span>
+                                        {% elif delivery.status == 'in_transit' %}
+                                            <span class="badge bg-info">W drodze</span>
+                                        {% elif delivery.status == 'out_for_delivery' %}
+                                            <span class="badge bg-warning">W dostarczaniu</span>
+                                        {% elif delivery.status == 'delivered' %}
+                                            <span class="badge bg-success">Dostarczone</span>
+                                        {% elif delivery.status == 'failed' %}
+                                            <span class="badge bg-danger">Nieudane</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ delivery.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ delivery.recipient_name }}</td>
+                                    <td>{{ delivery.delivery_address }}</td>
+                                    <td>{{ delivery.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                                    <td>
+                                        {% if delivery.estimated_delivery_time %}
+                                            {{ delivery.estimated_delivery_time.strftime('%d.%m.%Y %H:%M') }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('delivery_details', delivery_id=delivery.id) }}" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-eye"></i> Szczegóły
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Nie masz jeszcze żadnych zleceń dostaw. <a href="{{ url_for('create_delivery') }}" class="alert-link">Utwórz pierwsze zlecenie</a>.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Wróć do panelu
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Obsługa przycisków mapy
+    const showMapButton = document.getElementById('showOnMap');
+    const hideMapButton = document.getElementById('hideMap');
+    const mapSection = document.getElementById('mapSection');
+    
+    if (showMapButton) {
+        showMapButton.addEventListener('click', function() {
+            mapSection.style.display = 'flex';
+            initMap();
+            mapSection.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+    
+    if (hideMapButton) {
+        hideMapButton.addEventListener('click', function() {
+            mapSection.style.display = 'none';
+        });
+    }
+    
+    // Inicjalizacja mapy
+    function initMap() {
+        // Sprawdź czy mapa już istnieje
+        if (window.deliveryMap) return;
+        
+        // Inicjalizacja mapy
+        const map = L.map('delivery-map').setView([52.229676, 21.012229], 10); // Domyślny widok - Warszawa
+        window.deliveryMap = map;
+        
+        // Dodanie warstwy OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Dodanie markerów dla dostaw
+        const bounds = [];
+        
+        {% for delivery in deliveries %}
+            {% if delivery.pickup_lat and delivery.pickup_lng %}
+                var pickupMarker = L.marker([{{ delivery.pickup_lat }}, {{ delivery.pickup_lng }}], {
+                    icon: L.divIcon({
+                        className: 'custom-div-icon',
+                        html: '<div style="background-color: #3498db; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    })
+                }).addTo(map);
+                pickupMarker.bindPopup('<strong>Odbiór #{{ delivery.id }}</strong><br>{{ delivery.pickup_address }}');
+                bounds.push([{{ delivery.pickup_lat }}, {{ delivery.pickup_lng }}]);
+            {% endif %}
+            
+            {% if delivery.delivery_lat and delivery.delivery_lng %}
+                var deliveryMarker = L.marker([{{ delivery.delivery_lat }}, {{ delivery.delivery_lng }}], {
+                    icon: L.divIcon({
+                        className: 'custom-div-icon',
+                        html: '<div style="background-color: #e74c3c; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    })
+                }).addTo(map);
+                deliveryMarker.bindPopup(
+                    '<strong>Dostawa #{{ delivery.id }}</strong><br>' + 
+                    '{{ delivery.delivery_address }}<br>' +
+                    'Status: {% if delivery.status == "new" %}Nowe{% elif delivery.status == "assigned" %}Przypisane{% elif delivery.status == "in_progress" %}W realizacji{% elif delivery.status == "delivered" %}Dostarczone{% elif delivery.status == "failed" %}Nieudane{% else %}{{ delivery.status }}{% endif %}<br>' +
+                    '<a href="{{ url_for("delivery_details", delivery_id=delivery.id) }}" class="btn btn-sm btn-primary mt-2">Szczegóły</a>'
+                );
+                bounds.push([{{ delivery.delivery_lat }}, {{ delivery.delivery_lng }}]);
+            {% endif %}
+            
+            // Narysuj linie między punktami odbioru i dostawy
+            {% if delivery.pickup_lat and delivery.pickup_lng and delivery.delivery_lat and delivery.delivery_lng %}
+                var routeLine = L.polyline([
+                    [{{ delivery.pickup_lat }}, {{ delivery.pickup_lng }}],
+                    [{{ delivery.delivery_lat }}, {{ delivery.delivery_lng }}]
+                ], {
+                    color: '{% if delivery.status == "delivered" %}#2ecc71{% elif delivery.status == "failed" %}#e74c3c{% else %}#3498db{% endif %}',
+                    weight: 3,
+                    opacity: 0.7,
+                    dashArray: '5, 10'
+                }).addTo(map);
+            {% endif %}
+        {% endfor %}
+        
+        // Dopasowanie widoku mapy do wszystkich markerów
+        if (bounds.length > 0) {
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+    }
+});
+</script>
+{% endblock %}

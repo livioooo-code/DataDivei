@@ -740,3 +740,194 @@ def geocode_address():
     except requests.RequestException as e:
         app.logger.error(f"Error geocoding address: {str(e)}")
         return jsonify({'error': 'Failed to geocode address'}), 500
+        
+        
+# Funkcje dla giełdy zleceń transportowych
+@app.route('/deliveries/create', methods=['GET', 'POST'])
+@login_required
+def create_delivery():
+    """Tworzenie nowego zlecenia dostawy."""
+    form = DeliveryForm()
+    
+    # Pobierz dostępne trasy użytkownika do wyboru
+    user_routes = Route.query.all()
+    
+    if request.method == 'GET':
+        # Sprawdź czy podano route_id w parametrach URL
+        route_id = request.args.get('route_id')
+        if route_id:
+            # Znajdź trasę
+            route = Route.query.get(route_id)
+            if route:
+                # Wypełnij formularz danymi z trasy
+                form.route_id.data = route_id
+                
+    if form.validate_on_submit():
+        try:
+            # Sprawdź czy trasa istnieje
+            route_id = form.route_id.data
+            route = Route.query.get(route_id)
+            
+            if not route:
+                flash('Wybrana trasa nie istnieje.', 'danger')
+                return render_template('create_delivery.html', form=form, user_routes=user_routes)
+                
+            # Tworzenie nowej dostawy
+            new_delivery = Delivery(
+                route_id=route_id,
+                package_id=form.package_id.data,
+                package_description=form.package_description.data,
+                weight=form.weight.data,
+                recipient_name=form.recipient_name.data,
+                recipient_phone=form.recipient_phone.data,
+                recipient_email=form.recipient_email.data,
+                pickup_address=form.pickup_address.data,
+                pickup_lat=form.pickup_lat.data,
+                pickup_lng=form.pickup_lng.data,
+                delivery_address=form.delivery_address.data,
+                delivery_lat=form.delivery_lat.data,
+                delivery_lng=form.delivery_lng.data,
+                estimated_delivery_time=form.estimated_delivery_time.data,
+                notes=form.notes.data,
+                status='new'
+            )
+            
+            db.session.add(new_delivery)
+            db.session.commit()
+            
+            # Dodanie wpisu do historii statusów
+            status_history = DeliveryStatusHistory(
+                delivery_id=new_delivery.id, 
+                status='new',
+                notes='Utworzono nowe zlecenie dostawy'
+            )
+            
+            db.session.add(status_history)
+            db.session.commit()
+            
+            flash('Zlecenie dostawy zostało utworzone. Oczekuje na przydzielenie kuriera.', 'success')
+            return redirect(url_for('delivery_marketplace'))
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Błąd tworzenia dostawy: {str(e)}")
+            flash(f'Wystąpił błąd podczas tworzenia dostawy: {str(e)}', 'danger')
+    
+    return render_template('create_delivery.html', form=form, user_routes=user_routes)
+
+@app.route('/deliveries/my')
+@login_required
+def user_deliveries():
+    """Lista dostaw utworzonych przez użytkownika."""
+    # Filtrowanie dostaw
+    filter_form = DeliveryFilterForm(request.args, meta={'csrf': False})
+    status_filter = request.args.get('status', 'all')
+    
+    # Pobierz dostawy związane z trasami użytkownika
+    query = Delivery.query.join(Route).join(user_routes).filter(
+        user_routes.c.user_id == current_user.id,
+        Route.id == Delivery.route_id
+    )
+    
+    # Filtrowanie po statusie
+    if status_filter != 'all':
+        query = query.filter(Delivery.status == status_filter)
+    
+    # Filtrowanie po dacie
+    if filter_form.date_from.data:
+        query = query.filter(Delivery.created_at >= filter_form.date_from.data)
+    if filter_form.date_to.data:
+        query = query.filter(Delivery.created_at <= filter_form.date_to.data)
+    
+    # Wyszukiwanie
+    if filter_form.search.data:
+        search_term = f"%{filter_form.search.data}%"
+        query = query.filter(
+            db.or_(
+                Delivery.recipient_name.like(search_term),
+                Delivery.package_id.like(search_term),
+                Delivery.pickup_address.like(search_term),
+                Delivery.delivery_address.like(search_term)
+            )
+        )
+    
+    # Sortowanie - domyślnie po dacie utworzenia (najnowsze pierwsze)
+    deliveries = query.order_by(Delivery.created_at.desc()).all()
+    
+    return render_template(
+        'user_deliveries.html',
+        deliveries=deliveries,
+        filter_form=filter_form
+    )
+
+@app.route('/deliveries/<int:delivery_id>')
+@login_required
+def delivery_details(delivery_id):
+    """Szczegóły dostawy dla użytkownika."""
+    # Pobierz dostawę
+    delivery = Delivery.query.get_or_404(delivery_id)
+    
+    # Sprawdź czy użytkownik ma dostęp do tej dostawy
+    if current_user.is_courier:
+        courier = Courier.query.filter_by(user_id=current_user.id).first()
+        if delivery.courier_id != courier.id and delivery.status != 'new':
+            flash('Nie masz dostępu do tej dostawy.', 'danger')
+            return redirect(url_for('available_deliveries'))
+    else:
+        if delivery.route not in current_user.routes:
+            flash('Nie masz dostępu do tej dostawy.', 'danger')
+            return redirect(url_for('user_deliveries'))
+    
+    # Pobierz historię statusów
+    status_history = DeliveryStatusHistory.query.filter_by(
+        delivery_id=delivery.id
+    ).order_by(DeliveryStatusHistory.timestamp.desc()).all()
+    
+    return render_template(
+        'delivery_details.html',
+        delivery=delivery,
+        status_history=status_history
+    )
+
+@app.route('/deliveries/marketplace')
+@login_required
+def delivery_marketplace():
+    """Giełda zleceń transportowych dostępna dla wszystkich."""
+    # Filtrowanie dostaw
+    filter_form = DeliveryFilterForm(request.args, meta={'csrf': False})
+    status_filter = request.args.get('status', 'new')  # Domyślnie tylko nowe
+    
+    # Pobierz dostawy
+    query = Delivery.query
+    
+    # Filtrowanie po statusie
+    if status_filter != 'all':
+        query = query.filter(Delivery.status == status_filter)
+    else:
+        # Jeśli wybrano "wszystkie", to i tak pokaż tylko te, które można wziąć
+        query = query.filter(Delivery.status.in_(['new', 'failed']))
+    
+    # Filtrowanie po dacie
+    if filter_form.date_from.data:
+        query = query.filter(Delivery.created_at >= filter_form.date_from.data)
+    if filter_form.date_to.data:
+        query = query.filter(Delivery.created_at <= filter_form.date_to.data)
+    
+    # Wyszukiwanie
+    if filter_form.search.data:
+        search_term = f"%{filter_form.search.data}%"
+        query = query.filter(
+            db.or_(
+                Delivery.pickup_address.like(search_term),
+                Delivery.delivery_address.like(search_term)
+            )
+        )
+    
+    # Sortowanie - domyślnie po dacie utworzenia (najnowsze pierwsze)
+    deliveries = query.order_by(Delivery.created_at.desc()).all()
+    
+    return render_template(
+        'delivery_marketplace.html',
+        deliveries=deliveries,
+        filter_form=filter_form
+    )

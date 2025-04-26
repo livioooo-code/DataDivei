@@ -1,0 +1,316 @@
+{% extends 'layout.html' %}
+
+{% block title %}Utwórz nowe zlecenie dostawy{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-lg-12">
+            <h1 class="mb-4">Utwórz nowe zlecenie dostawy</h1>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+            {% endwith %}
+            
+            <div class="card shadow">
+                <div class="card-header">
+                    <h5 class="mb-0">Informacje o dostawie</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="deliveryForm">
+                        {{ form.csrf_token }}
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i> Wybierz trasę dla dostawy. Jeśli nie masz jeszcze trasy, <a href="{{ url_for('index') }}" class="alert-link">utwórz ją na mapie</a>.
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Wybierz trasę:</label>
+                                    <select class="form-select" name="route_id" required>
+                                        <option value="">-- Wybierz trasę --</option>
+                                        {% for route in user_routes %}
+                                        <option value="{{ route.id }}" {% if form.route_id.data == route.id|string %}selected{% endif %}>
+                                            {{ route.name }} ({{ "%.1f"|format(route.distance/1000) }} km)
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if form.route_id.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.route_id.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div id="route-preview" class="border rounded" style="height: 200px; background-color: #f8f9fa;">
+                                    <div class="text-center p-5 text-muted">
+                                        <i class="bi bi-map" style="font-size: 2rem;"></i>
+                                        <p class="mt-2">Podgląd trasy pojawi się po wybraniu.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h5 class="mb-3">Informacje o przesyłce</h5>
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.package_id.label(class="form-label") }}
+                                    {{ form.package_id(class="form-control") }}
+                                    {% if form.package_id.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.package_id.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.weight.label(class="form-label") }}
+                                    {{ form.weight(class="form-control", type="number", step="0.1", min="0") }}
+                                    <div class="form-text">Podaj wagę w kilogramach.</div>
+                                    {% if form.weight.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.weight.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.estimated_delivery_time.label(class="form-label") }}
+                                    {{ form.estimated_delivery_time(class="form-control", type="datetime-local") }}
+                                    {% if form.estimated_delivery_time.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.estimated_delivery_time.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    {{ form.package_description.label(class="form-label") }}
+                                    {{ form.package_description(class="form-control", rows=3) }}
+                                    {% if form.package_description.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.package_description.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h5 class="mb-3">Odbiorca</h5>
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.recipient_name.label(class="form-label") }}
+                                    {{ form.recipient_name(class="form-control", required=true) }}
+                                    {% if form.recipient_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.recipient_name.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.recipient_phone.label(class="form-label") }}
+                                    {{ form.recipient_phone(class="form-control") }}
+                                    {% if form.recipient_phone.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.recipient_phone.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.recipient_email.label(class="form-label") }}
+                                    {{ form.recipient_email(class="form-control", type="email") }}
+                                    {% if form.recipient_email.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.recipient_email.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h5 class="mb-3">Adresy</h5>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.pickup_address.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.pickup_address(class="form-control", required=true, id="pickup-address") }}
+                                        <button type="button" class="btn btn-outline-primary" id="search-pickup">
+                                            <i class="bi bi-search"></i>
+                                        </button>
+                                    </div>
+                                    {{ form.pickup_lat(id="pickup-lat") }}
+                                    {{ form.pickup_lng(id="pickup-lng") }}
+                                    {% if form.pickup_address.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.pickup_address.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.delivery_address.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.delivery_address(class="form-control", required=true, id="delivery-address") }}
+                                        <button type="button" class="btn btn-outline-primary" id="search-delivery">
+                                            <i class="bi bi-search"></i>
+                                        </button>
+                                    </div>
+                                    {{ form.delivery_lat(id="delivery-lat") }}
+                                    {{ form.delivery_lng(id="delivery-lng") }}
+                                    {% if form.delivery_address.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.delivery_address.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="mb-3">
+                                {{ form.notes.label(class="form-label") }}
+                                {{ form.notes(class="form-control", rows=3) }}
+                                {% if form.notes.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.notes.errors %}{{ error }}{% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('delivery_marketplace') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Anuluj
+                            </a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Funkcja geocodowania adresu
+    function geocodeAddress(address, targetLat, targetLng, button) {
+        if (!address) return;
+        
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        button.disabled = true;
+        
+        fetch(`/api/geocode?query=${encodeURIComponent(address)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Nie udało się znaleźć lokalizacji dla podanego adresu.');
+                    console.error(data.error);
+                } else if (data.length > 0) {
+                    const result = data[0];
+                    document.getElementById(targetLat).value = result.lat;
+                    document.getElementById(targetLng).value = result.lon;
+                    
+                    // Aktualizuj przycisk, aby pokazać sukces
+                    button.innerHTML = '<i class="bi bi-check-circle"></i>';
+                    button.className = 'btn btn-success';
+                    
+                    // Po 2 sekundach przywróć oryginalny wygląd przycisku
+                    setTimeout(() => {
+                        button.innerHTML = '<i class="bi bi-search"></i>';
+                        button.className = 'btn btn-outline-primary';
+                        button.disabled = false;
+                    }, 2000);
+                } else {
+                    alert('Nie znaleziono lokalizacji dla podanego adresu.');
+                    button.innerHTML = '<i class="bi bi-x-circle"></i>';
+                    button.className = 'btn btn-danger';
+                    
+                    // Po 2 sekundach przywróć oryginalny wygląd przycisku
+                    setTimeout(() => {
+                        button.innerHTML = '<i class="bi bi-search"></i>';
+                        button.className = 'btn btn-outline-primary';
+                        button.disabled = false;
+                    }, 2000);
+                }
+            })
+            .catch(error => {
+                console.error('Błąd geocodowania:', error);
+                alert('Wystąpił błąd podczas wyszukiwania adresu.');
+                button.innerHTML = '<i class="bi bi-exclamation-triangle"></i>';
+                button.className = 'btn btn-warning';
+                
+                // Po 2 sekundach przywróć oryginalny wygląd przycisku
+                setTimeout(() => {
+                    button.innerHTML = '<i class="bi bi-search"></i>';
+                    button.className = 'btn btn-outline-primary';
+                    button.disabled = false;
+                }, 2000);
+            });
+    }
+    
+    // Obsługa przycisków wyszukiwania adresu
+    const searchPickupButton = document.getElementById('search-pickup');
+    const searchDeliveryButton = document.getElementById('search-delivery');
+    
+    searchPickupButton.addEventListener('click', function() {
+        const address = document.getElementById('pickup-address').value;
+        geocodeAddress(address, 'pickup-lat', 'pickup-lng', this);
+    });
+    
+    searchDeliveryButton.addEventListener('click', function() {
+        const address = document.getElementById('delivery-address').value;
+        geocodeAddress(address, 'delivery-lat', 'delivery-lng', this);
+    });
+    
+    // Walidacja formularza przed wysłaniem
+    document.getElementById('deliveryForm').addEventListener('submit', function(event) {
+        const pickupLat = document.getElementById('pickup-lat').value;
+        const pickupLng = document.getElementById('pickup-lng').value;
+        const deliveryLat = document.getElementById('delivery-lat').value;
+        const deliveryLng = document.getElementById('delivery-lng').value;
+        
+        if (!pickupLat || !pickupLng) {
+            alert('Brak współrzędnych punktu odbioru. Kliknij przycisk wyszukiwania, aby je pobrać.');
+            event.preventDefault();
+            return false;
+        }
+        
+        if (!deliveryLat || !deliveryLng) {
+            alert('Brak współrzędnych punktu dostawy. Kliknij przycisk wyszukiwania, aby je pobrać.');
+            event.preventDefault();
+            return false;
+        }
+        
+        return true;
+    });
+});
+</script>
+{% endblock %}

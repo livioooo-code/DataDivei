@@ -97,12 +97,26 @@
                             </div>
                             <p class="mb-1">Przejdź do mapy, aby zaplanować nową trasę</p>
                         </a>
-                        <a href="#" class="list-group-item list-group-item-action" data-bs-toggle="modal" data-bs-target="#createDeliveryModal">
+                        <a href="{{ url_for('create_delivery') }}" class="list-group-item list-group-item-action">
                             <div class="d-flex w-100 justify-content-between">
                                 <h5 class="mb-1">Zlecenie dostawy</h5>
                                 <small><i class="bi bi-arrow-right"></i></small>
                             </div>
-                            <p class="mb-1">Utwórz zlecenie dostawy dla kuriera</p>
+                            <p class="mb-1">Utwórz nowe zlecenie dostawy dla kuriera</p>
+                        </a>
+                        <a href="{{ url_for('delivery_marketplace') }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">Giełda zleceń</h5>
+                                <small><i class="bi bi-arrow-right"></i></small>
+                            </div>
+                            <p class="mb-1">Przeglądaj dostępne zlecenia transportowe</p>
+                        </a>
+                        <a href="{{ url_for('user_deliveries') }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">Moje zlecenia</h5>
+                                <small><i class="bi bi-arrow-right"></i></small>
+                            </div>
+                            <p class="mb-1">Zarządzaj swoimi zleceniami transportowymi</p>
                         </a>
                     </div>
                 </div>
@@ -212,9 +226,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <a href="{{ url_for('index') }}?route=${route.id}" class="btn btn-primary">
                                         <i class="bi bi-eye"></i> Pokaż
                                     </a>
-                                    <button class="btn btn-success createDeliveryBtn" data-route-id="${route.id}">
+                                    <a href="{{ url_for('create_delivery') }}?route_id=${route.id}" class="btn btn-success">
                                         <i class="bi bi-box-seam"></i> Zlecenie
-                                    </button>
+                                    </a>
                                 </div>
                             </td>
                         </tr>

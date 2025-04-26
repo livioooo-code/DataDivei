@@ -1,0 +1,486 @@
+{% extends 'layout.html' %}
+
+{% block title %}Szczegóły dostawy{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Szczegóły dostawy #{{ delivery.id }}</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+    
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Informacje o dostawie</h5>
+                    <div>
+                        {% if delivery.status == 'new' %}
+                            <span class="badge bg-info">Nowe</span>
+                        {% elif delivery.status == 'assigned' %}
+                            <span class="badge bg-primary">Przypisane</span>
+                        {% elif delivery.status == 'in_progress' %}
+                            <span class="badge bg-warning">W realizacji</span>
+                        {% elif delivery.status == 'picked_up' %}
+                            <span class="badge bg-warning">Odebrana od nadawcy</span>
+                        {% elif delivery.status == 'in_transit' %}
+                            <span class="badge bg-info">W drodze</span>
+                        {% elif delivery.status == 'out_for_delivery' %}
+                            <span class="badge bg-warning">W trakcie dostarczania</span>
+                        {% elif delivery.status == 'delivered' %}
+                            <span class="badge bg-success">Dostarczona</span>
+                        {% elif delivery.status == 'failed' %}
+                            <span class="badge bg-danger">Nieudana</span>
+                        {% elif delivery.status == 'cancelled' %}
+                            <span class="badge bg-secondary">Anulowana</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ delivery.status }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Informacje o przesyłce</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th style="width: 40%">ID przesyłki:</th>
+                                    <td>{{ delivery.package_id or 'Nie określono' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Waga:</th>
+                                    <td>{{ delivery.weight }} kg</td>
+                                </tr>
+                                <tr>
+                                    <th>Utworzono:</th>
+                                    <td>{{ delivery.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Szac. czas dostawy:</th>
+                                    <td>
+                                        {% if delivery.estimated_delivery_time %}
+                                            {{ delivery.estimated_delivery_time.strftime('%d.%m.%Y %H:%M') }}
+                                        {% else %}
+                                            Nie określono
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        {% if delivery.status == 'new' %}
+                                            Nowa
+                                        {% elif delivery.status == 'assigned' %}
+                                            Przypisana
+                                        {% elif delivery.status == 'in_progress' %}
+                                            W realizacji
+                                        {% elif delivery.status == 'picked_up' %}
+                                            Odebrana od nadawcy
+                                        {% elif delivery.status == 'in_transit' %}
+                                            W drodze
+                                        {% elif delivery.status == 'out_for_delivery' %}
+                                            W trakcie dostarczania
+                                        {% elif delivery.status == 'delivered' %}
+                                            Dostarczona
+                                        {% elif delivery.status == 'failed' %}
+                                            Nieudana
+                                        {% elif delivery.status == 'cancelled' %}
+                                            Anulowana
+                                        {% else %}
+                                            {{ delivery.status }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            {% if delivery.package_description %}
+                                <h6 class="mt-3">Opis przesyłki</h6>
+                                <p>{{ delivery.package_description }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Informacje o odbiorcy</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th style="width: 40%">Nazwa:</th>
+                                    <td>{{ delivery.recipient_name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Telefon:</th>
+                                    <td>{{ delivery.recipient_phone or 'Nie określono' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Email:</th>
+                                    <td>{{ delivery.recipient_email or 'Nie określono' }}</td>
+                                </tr>
+                            </table>
+                            
+                            <h6 class="mt-3">Adres odbioru</h6>
+                            <p>{{ delivery.pickup_address }}</p>
+                            
+                            <h6 class="mt-3">Adres dostawy</h6>
+                            <p>{{ delivery.delivery_address }}</p>
+                            
+                            {% if delivery.notes %}
+                                <h6 class="mt-3">Uwagi</h6>
+                                <p>{{ delivery.notes }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if current_user.is_courier and delivery.courier_id == current_user.courier_profile.id %}
+                <div class="card shadow mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Aktualizacja statusu</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('update_delivery_status', delivery_id=delivery.id) }}" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status" required>
+                                    <option value="in_progress" {% if delivery.status == 'in_progress' %}selected{% endif %}>W realizacji</option>
+                                    <option value="picked_up" {% if delivery.status == 'picked_up' %}selected{% endif %}>Odebrana od nadawcy</option>
+                                    <option value="in_transit" {% if delivery.status == 'in_transit' %}selected{% endif %}>W drodze</option>
+                                    <option value="out_for_delivery" {% if delivery.status == 'out_for_delivery' %}selected{% endif %}>W trakcie dostarczania</option>
+                                    <option value="delivered" {% if delivery.status == 'delivered' %}selected{% endif %}>Dostarczona</option>
+                                    <option value="failed" {% if delivery.status == 'failed' %}selected{% endif %}>Nieudana próba dostarczenia</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="notes" class="form-label">Komentarz</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                                <div class="form-text">Opcjonalny komentarz do zmiany statusu.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="get-location-check" checked>
+                                    <label class="form-check-label" for="get-location-check">
+                                        Dodaj aktualną lokalizację
+                                    </label>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="get-location-btn">
+                                    <i class="bi bi-geo-alt"></i> Pobierz lokalizację
+                                </button>
+                            </div>
+                            
+                            <input type="hidden" id="current_lat" name="current_lat">
+                            <input type="hidden" id="current_lng" name="current_lng">
+                            
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-circle"></i> Aktualizuj status
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Mapa</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="delivery-map" style="height: 300px;"></div>
+                </div>
+            </div>
+            
+            <div class="card shadow">
+                <div class="card-header">
+                    <h5 class="mb-0">Historia statusów</h5>
+                </div>
+                <div class="card-body">
+                    {% if status_history %}
+                        <div class="timeline">
+                            {% for history in status_history %}
+                                <div class="timeline-item">
+                                    <div class="timeline-marker 
+                                        {% if history.status == 'new' %}marker-info
+                                        {% elif history.status == 'assigned' %}marker-primary
+                                        {% elif history.status == 'in_progress' %}marker-warning
+                                        {% elif history.status == 'picked_up' %}marker-warning
+                                        {% elif history.status == 'in_transit' %}marker-info
+                                        {% elif history.status == 'out_for_delivery' %}marker-warning
+                                        {% elif history.status == 'delivered' %}marker-success
+                                        {% elif history.status == 'failed' %}marker-danger
+                                        {% elif history.status == 'cancelled' %}marker-secondary
+                                        {% else %}marker-secondary
+                                        {% endif %}">
+                                    </div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-0">
+                                            {% if history.status == 'new' %}
+                                                Nowa
+                                            {% elif history.status == 'assigned' %}
+                                                Przypisana
+                                            {% elif history.status == 'in_progress' %}
+                                                W realizacji
+                                            {% elif history.status == 'picked_up' %}
+                                                Odebrana od nadawcy
+                                            {% elif history.status == 'in_transit' %}
+                                                W drodze
+                                            {% elif history.status == 'out_for_delivery' %}
+                                                W trakcie dostarczania
+                                            {% elif history.status == 'delivered' %}
+                                                Dostarczona
+                                            {% elif history.status == 'failed' %}
+                                                Nieudana
+                                            {% elif history.status == 'cancelled' %}
+                                                Anulowana
+                                            {% else %}
+                                                {{ history.status }}
+                                            {% endif %}
+                                        </h6>
+                                        <p class="text-muted small mb-1">
+                                            {{ history.timestamp.strftime('%d.%m.%Y %H:%M') }}
+                                        </p>
+                                        {% if history.notes %}
+                                            <p class="mb-0">{{ history.notes }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">Brak historii statusów.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        {% if current_user.is_courier %}
+            <a href="{{ url_for('courier_deliveries') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Wróć do listy dostaw
+            </a>
+        {% else %}
+            <a href="{{ url_for('user_deliveries') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Wróć do listy dostaw
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
+<style>
+    /* Style dla linii czasu */
+    .timeline {
+        position: relative;
+        padding-left: 25px;
+    }
+    
+    .timeline:before {
+        content: '';
+        position: absolute;
+        left: 10px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e9ecef;
+    }
+    
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    
+    .timeline-marker {
+        position: absolute;
+        left: -25px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #6c757d;
+        border: 2px solid #fff;
+    }
+    
+    .marker-info { background-color: #17a2b8; }
+    .marker-primary { background-color: #007bff; }
+    .marker-success { background-color: #28a745; }
+    .marker-warning { background-color: #ffc107; }
+    .marker-danger { background-color: #dc3545; }
+    .marker-secondary { background-color: #6c757d; }
+    
+    .timeline-content {
+        padding-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicjalizacja mapy
+    var map = L.map('delivery-map').setView([52.229676, 21.012229], 13); // Domyślny widok - Warszawa
+    
+    // Dodanie warstwy OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    
+    // Pobieranie współrzędnych
+    var pickupLat = {{ delivery.pickup_lat or 'null' }};
+    var pickupLng = {{ delivery.pickup_lng or 'null' }};
+    var deliveryLat = {{ delivery.delivery_lat or 'null' }};
+    var deliveryLng = {{ delivery.delivery_lng or 'null' }};
+    
+    var bounds = [];
+    
+    // Dodanie markera punktu odbioru
+    if (pickupLat && pickupLng) {
+        var pickupMarker = L.marker([pickupLat, pickupLng], {
+            icon: L.divIcon({
+                className: 'custom-div-icon',
+                html: '<div style="background-color: #3498db; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            })
+        }).addTo(map);
+        pickupMarker.bindPopup('<strong>Punkt odbioru</strong><br>' + '{{ delivery.pickup_address }}');
+        bounds.push([pickupLat, pickupLng]);
+    }
+    
+    // Dodanie markera punktu dostawy
+    if (deliveryLat && deliveryLng) {
+        var deliveryMarker = L.marker([deliveryLat, deliveryLng], {
+            icon: L.divIcon({
+                className: 'custom-div-icon',
+                html: '<div style="background-color: #e74c3c; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            })
+        }).addTo(map);
+        deliveryMarker.bindPopup('<strong>Punkt dostawy</strong><br>' + '{{ delivery.delivery_address }}');
+        bounds.push([deliveryLat, deliveryLng]);
+    }
+    
+    // Narysuj linię między punktami odbioru i dostawy jeśli oba są dostępne
+    if (pickupLat && pickupLng && deliveryLat && deliveryLng) {
+        var routeLine = L.polyline([
+            [pickupLat, pickupLng],
+            [deliveryLat, deliveryLng]
+        ], {
+            color: '#3498db',
+            weight: 3,
+            opacity: 0.7,
+            dashArray: '5, 10'
+        }).addTo(map);
+    }
+    
+    // Rysowanie trasy na podstawie polyline z trasy
+    {% if delivery.route.polyline %}
+    var routePolyline = L.polyline(polyline.decode('{{ delivery.route.polyline }}'), {
+        color: '#3498db',
+        weight: 5,
+        opacity: 0.7
+    }).addTo(map);
+    {% endif %}
+    
+    // Dopasowanie widoku mapy
+    if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }
+    
+    // Obsługa przycisku lokalizacji (dla kuriera)
+    var locationBtn = document.getElementById('get-location-btn');
+    if (locationBtn) {
+        var latInput = document.getElementById('current_lat');
+        var lngInput = document.getElementById('current_lng');
+        var locationCheck = document.getElementById('get-location-check');
+        
+        // Automatycznie pobierz lokalizację przy załadowaniu strony
+        if (navigator.geolocation && locationCheck.checked) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    latInput.value = position.coords.latitude;
+                    lngInput.value = position.coords.longitude;
+                    locationBtn.innerHTML = '<i class="bi bi-check-circle"></i> Lokalizacja pobrana';
+                    locationBtn.classList.remove('btn-outline-secondary');
+                    locationBtn.classList.add('btn-success');
+                },
+                function(error) {
+                    console.error('Błąd pobierania lokalizacji:', error);
+                }
+            );
+        }
+        
+        // Pobierz lokalizację po kliknięciu przycisku
+        locationBtn.addEventListener('click', function() {
+            if (navigator.geolocation) {
+                locationBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Pobieranie...';
+                locationBtn.disabled = true;
+                
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        latInput.value = position.coords.latitude;
+                        lngInput.value = position.coords.longitude;
+                        
+                        locationBtn.innerHTML = '<i class="bi bi-check-circle"></i> Lokalizacja pobrana';
+                        locationBtn.classList.remove('btn-outline-secondary');
+                        locationBtn.classList.add('btn-success');
+                        locationBtn.disabled = false;
+                        
+                        // Dodaj marker na mapie
+                        L.marker([position.coords.latitude, position.coords.longitude], {
+                            icon: L.divIcon({
+                                className: 'custom-div-icon',
+                                html: '<div style="background-color: #2ecc71; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                                iconSize: [20, 20],
+                                iconAnchor: [10, 10]
+                            })
+                        }).addTo(map)
+                        .bindPopup('Twoja aktualna lokalizacja')
+                        .openPopup();
+                        
+                        // Dopasowanie widoku mapy
+                        bounds.push([position.coords.latitude, position.coords.longitude]);
+                        if (bounds.length > 0) {
+                            map.fitBounds(bounds, { padding: [50, 50] });
+                        }
+                    },
+                    function(error) {
+                        console.error('Błąd pobierania lokalizacji:', error);
+                        locationBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Błąd lokalizacji';
+                        locationBtn.classList.remove('btn-outline-secondary');
+                        locationBtn.classList.add('btn-warning');
+                        locationBtn.disabled = false;
+                    }
+                );
+            }
+        });
+        
+        // Czyść lokalizację gdy checkbox jest odznaczony
+        locationCheck.addEventListener('change', function() {
+            if (!this.checked) {
+                latInput.value = '';
+                lngInput.value = '';
+                locationBtn.innerHTML = '<i class="bi bi-geo-alt"></i> Pobierz lokalizację';
+                locationBtn.className = 'btn btn-outline-secondary btn-sm mt-2';
+            } else {
+                // Automatycznie pobierz lokalizację
+                locationBtn.click();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
