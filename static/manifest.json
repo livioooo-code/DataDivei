@@ -2,7 +2,7 @@
   "name": "Animated Route Guidance",
   "short_name": "RouteGuide",
   "description": "Aplikacja do wizualizacji i animacji tras na mapie",
-  "start_url": "/",
+  "start_url": "/?mode=standalone",
   "scope": "/",
   "display": "standalone",
   "background_color": "#212529",
@@ -10,11 +10,23 @@
   "orientation": "any",
   "categories": ["navigation", "maps", "transport"],
   "prefer_related_applications": false,
+  "iarc_rating_id": "",
+  "related_applications": [],
+  "handle_links": "preferred",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "id": "/",
+  "edge_side_panel": {
+    "preferred_width": 376
+  },
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
   "screenshots": [
     {
       "src": "/static/screenshots/screenshot1.png",
       "sizes": "1280x720",
-      "type": "image/png"
+      "type": "image/png",
+      "form_factor": "wide"
     }
   ],
   "shortcuts": [

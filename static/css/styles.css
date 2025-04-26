@@ -6,6 +6,36 @@ body {
     overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
 }
 
+/* Styles for standalone mode (when installed as PWA) */
+body.standalone-mode {
+    /* Prevent browser UI elements from overlapping content */
+    padding-top: env(safe-area-inset-top, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+}
+
+/* For Android devices in standalone mode */
+@media all and (display-mode: standalone) {
+    body {
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Adjust navbar for standalone mode to prevent overlap with status bar */
+    .navbar {
+        padding-top: max(0.5rem, env(safe-area-inset-top, 0.5rem));
+    }
+    
+    /* Make the footer stay at bottom when the keyboard is visible */
+    footer {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        z-index: 1000;
+        padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+    }
+}
+
 main {
     flex: 1;
 }

@@ -1,8 +1,29 @@
 document.addEventListener('DOMContentLoaded', function() {
+  // Sprawdź czy aplikacja działa w trybie standalone (zainstalowana)
+  const isInStandaloneMode = () => {
+    return (window.matchMedia('(display-mode: standalone)').matches) || 
+           (window.navigator.standalone) || 
+           document.referrer.includes('android-app://');
+  };
+
+  // Dostosuj interfejs, jeśli aplikacja jest uruchomiona jako zainstalowana
+  if (isInStandaloneMode()) {
+    document.body.classList.add('standalone-mode');
+    console.log('Aplikacja uruchomiona w trybie standalone (zainstalowana)');
+    
+    // Ukryj nagłówek przeglądarki w trybie standalone na Androidzie
+    if (/Android/i.test(navigator.userAgent)) {
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', '#212529');
+      }
+    }
+  }
+
   // Zarejestruj service worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/static/service-worker.js')
+      navigator.serviceWorker.register('/sw.js')
         .then((registration) => {
           console.log('Service Worker zarejestrowany pomyślnie:', registration.scope);
         })
@@ -56,5 +77,22 @@ document.addEventListener('DOMContentLoaded', function() {
     if (installButton) {
       installButton.style.display = 'none';
     }
+    document.body.classList.add('standalone-mode');
   });
+  
+  // Dodaj obsługę dla przycisku wstecz na Androidzie
+  if ('navigation' in window) {
+    window.addEventListener('popstate', (e) => {
+      // Jeśli nie ma więcej stron w historii i aplikacja jest w trybie standalone
+      if (isInStandaloneMode() && window.navigation.currentEntry?.index === 0) {
+        // Zapobiegaj zamknięciu aplikacji, pokazując dialog
+        if (confirm('Czy chcesz zamknąć aplikację?')) {
+          window.close();
+        } else {
+          // Zapobiegaj zamknięciu aplikacji
+          history.pushState(null, '', window.location.href);
+        }
+      }
+    });
+  }
 });
