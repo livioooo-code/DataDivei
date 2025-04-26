@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import polyline
+import stripe
 from datetime import datetime
 from urllib.parse import urlparse
 from flask import render_template, request, jsonify, url_for, redirect, flash
@@ -10,6 +11,9 @@ from app import app, db
 from models import Route, User, user_routes, Courier, Delivery, DeliveryStatusHistory
 from werkzeug.security import generate_password_hash, check_password_hash
 from payments import create_checkout_session, check_payment_status, mark_delivery_as_paid
+
+# Konfiguracja Stripe
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 from forms import (
     LoginForm, RegistrationForm, CourierProfileForm, DeliveryForm,
     DeliveryStatusUpdateForm, CourierStatusForm, DeliveryFilterForm
@@ -1020,12 +1024,18 @@ def payment_webhook():
     sig_header = request.headers.get('Stripe-Signature')
     
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, os.environ.get('STRIPE_WEBHOOK_SECRET', '')
-        )
+        webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, webhook_secret
+            )
+        else:
+            # W środowisku deweloperskim, gdy nie mamy skonfigurowanego sekretu webhooka
+            data = json.loads(payload)
+            event = data
     except ValueError as e:
         # Nieprawidłowe dane żądania
-        app.logger.error(f"Błąd webhookn - nieprawidłowe dane: {str(e)}")
+        app.logger.error(f"Błąd webhook - nieprawidłowe dane: {str(e)}")
         return jsonify({'error': 'Nieprawidłowe dane żądania'}), 400
     except stripe.error.SignatureVerificationError as e:
         # Nieprawidłowy podpis
@@ -1045,6 +1055,17 @@ def payment_webhook():
             delivery.paid_at = datetime.utcnow()
             db.session.commit()
             
+            # Dodaj wpis do historii statusów
+            status_history = DeliveryStatusHistory(
+                delivery_id=delivery.id,
+                status='payment_confirmed',
+                notes='Płatność online została potwierdzona przez Stripe'
+            )
+            db.session.add(status_history)
+            db.session.commit()
+            
             app.logger.info(f"Płatność oznaczona jako zrealizowana dla dostawy #{delivery.id}")
+        else:
+            app.logger.error(f"Nie znaleziono dostawy dla payment_intent: {payment_intent['id']}")
     
     return jsonify({'status': 'success'}), 200
